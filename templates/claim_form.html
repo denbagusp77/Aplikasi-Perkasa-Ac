@@ -1,0 +1,35 @@
+{% extends 'base_modern.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Form Klaim Service</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Customer:</strong> {{ unit.customer.nama }}</p>
+            <p><strong>Unit AC:</strong> {{ unit.merk }} - {{ unit.pk }} PK</p>
+            <p><strong>Tanggal Service:</strong> {{ service.tanggal.strftime('%d-%m-%Y') }}</p>
+
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="deskripsi" class="form-label">Deskripsi Klaim</label>
+                    <textarea name="deskripsi" id="deskripsi" class="form-control" rows="4" required></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="foto" class="form-label">Upload Foto (opsional)</label>
+                    <input type="file" name="foto" id="foto" class="form-control" accept="image/*">
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-circle"></i> Simpan Klaim
+                </button>
+                <a href="{{ url_for('units', cid=unit.customer_id) }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Kembali
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

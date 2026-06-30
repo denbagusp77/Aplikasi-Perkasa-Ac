@@ -1,0 +1,223 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<style>
+  .card-glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .card-glass:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
+  .timeline-line {
+    position: absolute;
+    left: 15px; top: 0; bottom: 0;
+    width: 2px; background: rgba(13,110,253,0.2);
+  }
+  .timeline-dot {
+    width: 12px; height: 12px;
+    background: #0d6efd; border-radius: 50%;
+    position: absolute; left: 10px;
+    border: 2px solid #fff;
+    box-shadow: 0 0 6px rgba(0,0,0,0.2);
+  }
+  .badge-modern { font-size: .75rem; padding: .35em .6em; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3 class="fw-bold text-primary">
+    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+  </h3>
+</div>
+
+<!-- 📊 Statistik -->
+<div class="row g-3 mb-4">
+  {% for label, val, icon, color in [
+    ('Customers', total_customers, 'people-fill', 'primary'),
+    ('Units', total_units, 'cpu-fill', 'info'),
+    ('Service Hari Ini', today_services, 'wrench-adjustable', 'warning'),
+    ('Pendapatan Bulan Ini', 'Rp ' ~ '{:,.0f}'.format(revenue), 'wallet2', 'success')
+  ] %}
+  <div class="col-md-3">
+    <div class="card-glass rounded-4 p-3 text-center h-100">
+      <div class="fs-3 text-{{ color }}"><i class="bi bi-{{ icon }}"></i></div>
+      <div class="fw-bold text-{{ color }} h5 mt-2">{{ val }}</div>
+      <small class="text-muted">{{ label }}</small>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card-glass rounded-4 p-4 mb-4 text-center">
+  <h5 class="fw-semibold text-success">Total Keseluruhan Pendapatan</h5>
+  <p class="display-6 fw-bold text-success mb-0">
+    Rp {{ "{:,.0f}".format(total_all_revenue) }}
+  </p>
+</div>
+
+<div class="row">
+  <!-- 🛎 Kolom kiri -->
+  <div class="col-lg-6">
+    <!-- 🔔 Auto Reminders -->
+    <div class="card-glass rounded-4 p-3 mb-4">
+      <h5 class="fw-semibold mb-3 text-primary"><i class="bi bi-bell-fill me-2"></i> Auto Reminders</h5>
+      {% if auto_reminders %}
+        {% for r in auto_reminders %}
+          <div class="d-flex align-items-center mb-3">
+            <div class="fs-4 text-primary me-3"><i class="bi bi-calendar-event-fill"></i></div>
+            <div class="flex-fill">
+              <div class="fw-bold">{{ r.nama }}</div>
+              <small class="text-muted">{{ r.unit }} | {{ r.tanggal.strftime("%d-%m-%Y") }}</small>
+            </div>
+            <span class="badge-modern 
+              {% if r.tipe == 'H-7' %} bg-warning text-dark
+              {% elif r.tipe == 'H-1' %} bg-danger
+              {% else %} bg-success {% endif %}">
+              {{ r.tipe }}
+            </span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted fst-italic">Tidak ada reminder terdekat</p>
+      {% endif %}
+    </div>
+
+    <!-- 🕒 Aktivitas Terakhir -->
+    <div class="card-glass rounded-4 p-3 mb-4 position-relative shadow-sm">
+      <h5 class="fw-semibold mb-4 text-secondary">
+        <i class="bi bi-clock-history me-2"></i> Aktivitas Terakhir
+      </h5>
+      {% if recent_services %}
+        <div class="timeline-line"></div>
+        {% for s in recent_services[:5] %}
+          <div class="mb-4 position-relative ps-5">
+            <span class="timeline-dot" style="top:8px;"></span>
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="fw-bold">{{ s.ac_unit.customer.nama }}</div>
+                <small class="text-muted">{{ s.tanggal.strftime("%d-%m-%Y") }} — {{ s.jenis_service }}</small>
+              </div>
+              <div class="text-end">
+                <div class="fw-bold text-success">
+                  Rp {{ '{:,.0f}'.format((s.harga_satuan|float) * (s.jumlah|int)) }}
+                </div>
+                <a href="{{ url_for('invoice_detail', id=s.id) }}" 
+                   class="btn btn-sm btn-outline-primary mt-1 rounded-pill px-3 py-0">
+                  Invoice
+                </a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted fst-italic">Belum ada aktivitas</p>
+      {% endif %}
+    </div>
+  </div>
+<!-- ❗ Kolom Kanan -->
+<div class="col-lg-6">
+
+  <!-- 📢 Klaim Customer -->
+  <div class="card-glass rounded-4 p-3 mb-4">
+    <h5 class="fw-semibold text-primary">
+      <i class="bi bi-flag-fill me-2"></i> Klaim Customer
+    </h5>
+
+    {% if customers %}
+      {% for c in customers %}
+        {% set pending_claims = c.claims|selectattr("status", "equalto", "Pending")|list|length %}
+        {% set done_claims = c.claims|selectattr("status", "equalto", "Selesai")|list|length %}
+
+        <div class="mb-2 p-2 border rounded-3 d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ c.nama }}</strong>
+          </div>
+          <div>
+            <span class="badge bg-warning text-dark me-1">Pending: {{ pending_claims }}</span>
+            <span class="badge bg-success">Selesai: {{ done_claims }}</span>
+            <a href="{{ url_for('claim_list', customer_id=c.id) }}" 
+               class="btn btn-sm btn-outline-primary ms-2 rounded-pill px-3 py-0">
+               Lihat
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted fst-italic">Belum ada klaim customer</p>
+    {% endif %}
+    <div class="text-end mt-2">
+      <a href="{{ url_for('claim_list_all') }}" class="btn btn-sm btn-outline-primary rounded-pill">
+        Lihat Semua
+      </a>
+    </div>
+  </div>
+
+  <!-- ❗ Belum Lunas (pindahkan ke bawah Klaim Customer) -->
+  <div class="card-glass rounded-4 p-3 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-semibold text-danger">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> Belum Lunas
+      </h5>
+      <a href="{{ url_for('unpaid_list') }}" 
+         class="btn btn-outline-danger btn-sm rounded-pill px-3">
+        Lihat Semua
+      </a>
+    </div>
+    {% if unpaid_services %}
+      <div class="list-group list-group-flush">
+        {% for s in unpaid_services[:5] %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">{{ s.ac_unit.customer.nama }}</div>
+              <small class="text-muted">
+                {{ s.jenis_service }} — {{ s.tanggal.strftime("%d-%m-%Y") }}
+              </small>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-danger">
+                Rp {{ '{:,.0f}'.format((s.harga_satuan or 0) * (s.jumlah or 1)) }}
+              </span>
+              <a href="{{ url_for('service_edit', id=s.id)}}" 
+                 class="btn btn-sm btn-outline-secondary ms-2 rounded-pill px-3">
+                Edit
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-muted fst-italic">Tidak ada tagihan tertunda</p>
+    {% endif %}
+  </div>
+
+  <!-- ⭐ Best Seller -->
+  <div class="card-glass rounded-4 p-3 shadow-sm">
+    <h5 class="fw-semibold mb-3 text-warning"><i class="bi bi-star-fill me-2"></i> Best Seller Bulan Ini</h5>
+    {% if best_sellers %}
+      {% set max_val = best_sellers[0].jumlah %}
+      {% for bs in best_sellers %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small">
+            <span class="fw-bold">{{ bs.jenis }}</span>
+            <span class="text-muted">{{ bs.jumlah }}x</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar 
+              {% if loop.index == 1 %}bg-success
+              {% elif loop.index == 2 %}bg-info
+              {% else %}bg-primary{% endif %}" 
+              style="width: {{ (bs.jumlah / max_val * 100) | round(0) }}%">
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted fst-italic">Belum ada data service bulan ini</p>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}

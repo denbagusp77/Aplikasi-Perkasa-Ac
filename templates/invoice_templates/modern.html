@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { font-family: Arial; font-size: 10pt; }
+.header { display:flex; justify-content:space-between; }
+.title { font-size:20pt; font-weight:bold; color:#444; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+td { padding:6px; }
+.total-box {
+  margin-top:20px;
+  width:40%;
+  float:right;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <div>
+    <h3>Perkasa AC</h3>
+    Palembang
+  </div>
+  <div style="text-align:right;">
+    <div class="title">INVOICE</div>
+    {{ invoice.tanggal.strftime("%d %B %Y") }}
+  </div>
+</div>
+
+<hr>
+
+<b>Kepada:</b><br>
+{{ invoice.customer.nama }}
+
+<table>
+{% for item in invoice.items %}
+<tr>
+  <td>{{ item.deskripsi }}</td>
+  <td align="right">Rp {{ "{:,.0f}".format(item.subtotal if item.subtotal else 0) }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<div class="total-box">
+  <hr>
+  <b>Total: Rp {{ "{:,.0f}".format(total) }}</b>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,268 @@
+{% extends "base_modern.html" %} 
+{% block content %}
+<div class="container mt-4">
+  <h3 class="mb-4">📊 Daftar Transaksi</h3>
+
+  <!-- Ringkasan -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 bg-success text-white">
+        <div class="card-body">
+          <h6>Total Pendapatan</h6>
+          Rp {{ "{:,.0f}".format(total_pendapatan or 0) }}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 bg-danger text-white">
+        <div class="card-body">
+          <h6>Total Pengeluaran</h6>
+          Rp {{ "{:,.0f}".format(total_pengeluaran or 0) }}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 bg-primary text-white">
+        <div class="card-body">
+          <h6>Saldo Bersih</h6>
+          Rp {{ "{:,.0f}".format((total_pendapatan or 0) - (total_pengeluaran or 0)) }}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 bg-info text-white">
+        <div class="card-body">
+          <h6>Pendapatan Internal</h6>
+          Rp {{ "{:,.0f}".format(total_internal or 0) }}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 mt-3">
+      <div class="card shadow-sm border-0 bg-warning text-dark">
+        <div class="card-body">
+          <h6>Pendapatan Eksternal</h6>
+          Rp {{ "{:,.0f}".format(total_eksternal or 0) }}
+        </div>
+      </div>
+    </div>
+    <!-- Ringkasan Pendapatan per Teknisi -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <h5 class="mb-3">👨‍🔧 Pendapatan Per Teknisi</h5>
+
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr>
+          <th>Nama Teknisi</th>
+          <th class="text-end">Total Pendapatan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nama, total in pendapatan_teknisi %}
+        <tr>
+          <td>{{ nama or '-' }}</td>
+          <td class="text-end">
+            Rp {{ "{:,.0f}".format(total or 0) }}
+          </td>
+        </tr>
+        {% endfor %}
+
+        {% if pendapatan_teknisi|length == 0 %}
+        <tr>
+          <td colspan="2" class="text-center text-muted">Belum ada data pendapatan teknisi</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <h5 class="mb-3 text-danger">💸 Pengeluaran Per Teknisi</h5>
+
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr>
+          <th>Nama Teknisi</th>
+          <th class="text-end">Total Pengeluaran</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nama, total in pengeluaran_teknisi %}
+        <tr>
+          <td>{{ nama or '-' }}</td>
+          <td class="text-end">Rp {{ "{:,.0f}".format(total or 0) }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="2" class="text-center text-muted">Belum ada pengeluaran teknisi</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <h5 class="mb-3 text-primary">📘 Pendapatan Bersih Per Teknisi</h5>
+
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr>
+          <th>Nama Teknisi</th>
+          <th class="text-end">Pendapatan Bersih</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nama, total in bersih_teknisi %}
+        <tr>
+          <td>{{ nama or '-' }}</td>
+          <td class="text-end">
+            <strong>Rp {{ "{:,.0f}".format(total or 0) }}</strong>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="2" class="text-center text-muted">Belum ada data bersih teknisi</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+  </div>
+
+  <!-- Tombol Tambah -->
+  <a href="{{ url_for('transaction_new') }}" class="btn btn-primary btn-sm mt-2 mt-md-0">
+    + Tambah Transaksi
+  </a>
+
+  <!-- Filter Bulan & Tahun -->
+  <form method="get" class="row g-2 mt-3 mb-3 align-items-end">
+    <div class="col-auto">
+      <label>Bulan</label>
+      <select name="bulan" class="form-select">
+        {% for b in range(1, 13) %}
+          <option value="{{ b }}" {% if bulan==b %}selected{% endif %}>{{ "%02d"|format(b) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label>Tahun</label>
+      <select name="tahun" class="form-select">
+        {% for y in range(2023, 2031) %}
+          <option value="{{ y }}" {% if tahun==y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary">Filter Bulan</button>
+    </div>
+    <div class="col-auto">
+      <a href="{{ url_for('transactions', all=1) }}" class="btn btn-info">Lihat Semua</a>
+    </div>
+  </form>
+
+  <!-- Filter Tanggal -->
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+      <input type="date" name="start_date" value="{{ start_date or '' }}" class="form-control" />
+    </div>
+    <div class="col-auto">
+      <input type="date" name="end_date" value="{{ end_date or '' }}" class="form-control" />
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary">Filter</button>
+    </div>
+    <div class="col-auto">
+      <a href="{{ url_for('transactions') }}" class="btn btn-secondary">Reset</a>
+    </div>
+  </form>
+
+  <!-- Tabel Transaksi -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">📑 Daftar Transaksi</h5>
+      
+      <!-- Tombol Bersihkan Data Rp 0 -->
+      <form action="{{ url_for('cleanup_zero') }}" method="post" style="display:inline;">
+        <button type="submit" class="btn btn-danger btn-sm"
+                onclick="return confirm('Yakin hapus semua service & transaksi Rp 0?')">
+          🧹 Bersihkan Data Rp 0
+        </button>
+      </form>
+    </div>
+
+    <form method="post" action="{{ url_for('transaction_bulk_delete') }}" id="bulkDeleteForm">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th><input type="checkbox" id="selectAll"></th>
+            <th>Tanggal</th>
+            <th>Kategori</th>
+            <th>Jenis</th>
+            <th>Deskripsi</th>
+            <th>Pendapatan Tipe</th>
+            <th>Teknisi</th>
+            <th class="text-end">Jumlah</th>
+            <th class="text-center">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+          <tr>
+            <td>
+              <input type="checkbox" name="selected_ids" value="{{ t.id }}">
+            </td>
+            <td>{{ t.tanggal.strftime('%d-%m-%Y') }}</td>
+            <td>
+              {% if t.kategori == "Pendapatan" %}
+                <span class="badge bg-success">{{ t.kategori }}</span>
+              {% else %}
+                <span class="badge bg-danger">{{ t.kategori }}</span>
+              {% endif %}
+            </td>
+            <td>{{ t.jenis }}</td>
+            <td>{{ t.deskripsi }}</td>
+            <td>{{ t.pendapatan_tipe or '-' }}</td>
+            <td>{{ t.technician_nama or '-' }}</td>
+            <td class="text-end">Rp {{ "{:,.0f}".format(t.jumlah) }}</td>
+            <td class="text-center">
+              <form method="post" action="{{ url_for('transaction_delete', id=t.id) }}" onsubmit="return confirm('Yakin hapus transaksi ini?')">
+                <button class="btn btn-sm btn-outline-danger">🗑 Hapus</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="text-center text-muted">Belum ada transaksi</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="submit" class="btn btn-danger mt-2"
+              onclick="return confirm('Yakin ingin menghapus transaksi yang dipilih?')">
+        🗑 Hapus yang Dipilih
+      </button>
+    </form>
+  </div>
+</div>
+
+</div>
+
+<!-- JS: Select All Checkbox -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const selectAll = document.getElementById("selectAll");
+    const checkboxes = document.querySelectorAll("input[name='selected_ids']");
+
+    selectAll.addEventListener("change", function () {
+      checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+  });
+</script>
+
+{% endblock %}

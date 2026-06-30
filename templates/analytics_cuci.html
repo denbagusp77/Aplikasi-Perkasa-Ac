@@ -1,0 +1,154 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container mt-4">
+
+<h3>📊 Dashboard Analisa Service Cuci AC</h3>
+
+<!-- SUMMARY -->
+<div class="row mt-3">
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm">
+            <b>Total Unit</b>
+            <h4>{{ total_unit }}</h4>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm">
+            <b>Rata-rata/Bulan</b>
+            <h4>{{ avg_bulan }}</h4>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm">
+            <b>Trend</b>
+            <h4>
+                {% if trend == "Naik" %}
+                    <span class="text-success">⬆ Naik</span>
+                {% elif trend == "Turun" %}
+                    <span class="text-danger">⬇ Turun</span>
+                {% else %}
+                    Stabil
+                {% endif %}
+            </h4>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm">
+            <b>Peak Season</b>
+            <h4>{{ peak_month[0] }}</h4>
+        </div>
+    </div>
+</div>
+
+<!-- OMSET -->
+<div class="row mt-3">
+    <div class="col-md-6">
+        <div class="card p-3 shadow-sm">
+            <b>Total Omset</b>
+            <h4>Rp {{ "{:,.0f}".format(total_omset) }}</h4>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3 shadow-sm">
+            <b>Estimasi Profit (30%)</b>
+            <h4>Rp {{ "{:,.0f}".format(estimasi_profit) }}</h4>
+        </div>
+    </div>
+</div>
+
+<hr>
+
+<h5>📈 Trend & Forecast</h5>
+<canvas id="trendChart"></canvas>
+
+<h5 class="mt-4">🏢 Internal vs Eksternal</h5>
+<canvas id="teamChart"></canvas>
+
+<hr>
+
+<h5>📅 Heatmap Hari Ramai</h5>
+<table class="table text-center">
+<tr>
+{% for h,t in hari_data %}
+<td style="background-color: rgba(255,0,0,{{ t / hari_data[0][1] }}); color:white;">
+{{ h }}<br>{{ t }}
+</td>
+{% endfor %}
+</tr>
+</table>
+
+<hr>
+
+<h5>📈 Growth Bulanan</h5>
+<table class="table table-bordered">
+<tr><th>Bulan</th><th>Growth %</th></tr>
+{% for b,g in growth_data %}
+<tr>
+<td>{{ b }}</td>
+<td>
+{% if g > 0 %}
+<span class="text-success">+{{ g }}%</span>
+{% elif g < 0 %}
+<span class="text-danger">{{ g }}%</span>
+{% else %}
+{{ g }}%
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</table>
+
+<hr>
+
+<h5>🧠 Insight Otomatis</h5>
+<div class="card p-3 bg-light">
+<ul>
+{% for i in insight %}
+<li>{{ i }}</li>
+{% endfor %}
+</ul>
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const bulanLabels = {{ bulan_data | map(attribute=0) | list | tojson }};
+const bulanValues = {{ bulan_data | map(attribute=1) | list | tojson }};
+const forecastValues = {{ forecast_values | tojson }};
+
+new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+        labels: bulanLabels.concat(forecastValues.map((_,i)=>"F"+(i+1))),
+        datasets: [
+            {
+                label: 'Actual',
+                data: bulanValues,
+                borderWidth: 3
+            },
+            {
+                label: 'Forecast',
+                data: Array(bulanValues.length).fill(null).concat(forecastValues),
+                borderDash: [5,5],
+                borderWidth: 3
+            }
+        ]
+    }
+});
+
+new Chart(document.getElementById('teamChart'), {
+    type: 'pie',
+    data: {
+        labels: ['Internal','Eksternal'],
+        datasets: [{
+            data: [{{ internal }}, {{ external }}]
+        }]
+    }
+});
+</script>
+
+{% endblock %}

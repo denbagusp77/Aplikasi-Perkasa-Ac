@@ -1,0 +1,239 @@
+{% extends "base_modern.html" %}
+{% block content %}
+
+<style>
+.invoice-page {
+  min-height: calc(100vh - 80px);
+}
+
+.card-modern {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+}
+
+.table td, .table th {
+  vertical-align: middle;
+}
+
+.summary-box {
+  background: linear-gradient(135deg,#1e293b,#0f172a);
+  color: white;
+  border-radius: 16px;
+  padding: 20px;
+}
+</style>
+
+<div class="container-fluid invoice-page">
+
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center">
+      <img src="{{ url_for('static', filename='logo.png') }}" width="50" class="me-3">
+      <div>
+        <h4 class="mb-0 fw-bold">Invoice #{{ invoice.id }}</h4>
+        <small class="text-muted">Perkasa AC Service Management</small>
+      </div>
+    </div>
+
+    <a href="{{ url_for('customers') }}" class="btn btn-outline-dark btn-sm">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+  </div>
+
+  <div class="row">
+
+    <!-- ================= LEFT PREVIEW ================= -->
+    <div class="col-lg-8">
+
+      <!-- CUSTOMER -->
+      <div class="card card-modern mb-3">
+        <div class="card-body">
+          <h6 class="fw-bold mb-1">{{ invoice.customer.nama }}</h6>
+          <small class="text-muted">
+            {{ invoice.customer.alamat or '-' }} <br>
+            WA {{ invoice.customer.nomor_wa }}
+          </small>
+        </div>
+      </div>
+
+      <!-- ITEMS -->
+      <div class="card card-modern">
+        <div class="card-body p-0">
+
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Ruangan</th>
+                <th>Deskripsi</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end">Harga</th>
+                <th class="text-end">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in invoice.items %}
+              {% set qty = item.service.jumlah if item.service else 1 %}
+              {% set harga = item.harga if item.harga else (item.service.harga_satuan if item.service else 0) %}
+              <tr>
+                <td>{{ item.service.ac_unit.ruangan if item.service else '-' }}</td>
+                <td>
+                  {{ item.deskripsi or (item.service.jenis_service if item.service else '-') }}
+                </td>
+                <td class="text-end">{{ qty }}</td>
+                <td class="text-end">{{ harga|rupiah }}</td>
+                <td class="text-end">{{ (qty * harga)|rupiah }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- ================= RIGHT CONTROL PANEL ================= -->
+    <div class="col-lg-4">
+
+      <!-- SUMMARY -->
+      <div class="summary-box mb-3">
+        <div class="d-flex justify-content-between">
+          <span>Subtotal</span>
+          <span>{{ subtotal|rupiah }}</span>
+        </div>
+
+        {% if ppn_amt %}
+        <div class="d-flex justify-content-between">
+          <span>PPN</span>
+          <span>{{ ppn_amt|rupiah }}</span>
+        </div>
+        {% endif %}
+
+        {% if pph_amt %}
+        <div class="d-flex justify-content-between">
+          <span>PPh</span>
+          <span>{{ pph_amt|rupiah }}</span>
+        </div>
+        {% endif %}
+
+        <hr class="border-light">
+
+        <div class="d-flex justify-content-between fs-5 fw-bold">
+          <span>Total</span>
+          <span>{{ total|rupiah }}</span>
+        </div>
+      </div>
+
+      <!-- PERHITUNGAN -->
+      <div class="card card-modern mb-3">
+        <div class="card-body">
+
+          <h6 class="fw-bold mb-3">Perhitungan</h6>
+
+          <form method="get" action="{{ url_for('invoice_detail', id=invoice.id) }}">
+
+            <label>PPN (%)</label>
+            <input type="number" step="0.1" name="ppn" value="{{ ppn }}" class="form-control mb-2">
+
+            <label>PPh (%) / Rp</label>
+            <input type="text" name="pph" value="{{ pph }}" class="form-control mb-2">
+
+            <label>Biaya Admin</label>
+            <input type="number" name="admin_fee" value="{{ admin_fee }}" class="form-control mb-2">
+
+            <label>DP</label>
+            <input type="number" name="dp" value="{{ dp }}" class="form-control mb-3">
+
+            <button class="btn btn-dark w-100">
+              Hitung Ulang
+            </button>
+          </form>
+
+        </div>
+      </div>
+
+      <!-- TEMPLATE -->
+      <div class="card card-modern mb-3">
+  <div class="card-body">
+
+    <h6 class="fw-bold mb-4">Administrasi Invoice</h6>
+
+    <form method="post" action="{{ url_for('update_invoice_admin', id=invoice.id) }}">
+
+      <!-- MODEL -->
+      <div class="mb-3">
+        <label class="form-label">Model Invoice</label>
+        <select name="template" class="form-select">
+          <option value="classic" {% if invoice.template=='classic' %}selected{% endif %}>Classic</option>
+          <option value="modern" {% if invoice.template=='modern' %}selected{% endif %}>Modern Minimal</option>
+          <option value="corporate" {% if invoice.template=='corporate' %}selected{% endif %}>Corporate Detail</option>
+          <option value="industrial" {% if invoice.template=='industrial' %}selected{% endif %}>Industrial Landscape</option>
+        </select>
+      </div>
+
+      <!-- TANGGAL -->
+      <div class="mb-3">
+        <label class="form-label">Tanggal Invoice</label>
+        <input type="date"
+               name="tanggal"
+               value="{{ invoice.tanggal.strftime('%Y-%m-%d') if invoice.tanggal else '' }}"
+               class="form-control">
+      </div>
+
+      <!-- SPO -->
+      <div class="mb-3">
+        <label class="form-label">Nomor SPO</label>
+        <input type="text"
+               name="spo"
+               value="{{ invoice.spo or '' }}"
+               class="form-control">
+      </div>
+
+      <!-- REKENING -->
+      <div class="mb-4">
+        <label class="form-label">Rekening Pembayaran</label>
+        <select name="bank_account_id" class="form-select">
+          <option value="">-- Pilih Rekening --</option>
+          {% for bank in bank_accounts %}
+          <option value="{{ bank.id }}"
+            {% if invoice.bank_account_id == bank.id %}selected{% endif %}>
+            {{ bank.bank_name }} - {{ bank.account_number }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-dark w-100">
+        <i class="bi bi-save me-1"></i> Simpan Perubahan
+      </button>
+
+    </form>
+
+  </div>
+</div>
+
+      <!-- PRINT BUTTON -->
+      {% if invoice.spo %}
+      <a href="{{ url_for('invoice_pdf', id=invoice.id, ppn=ppn, pph=pph, admin_fee=admin_fee, dp=dp) }}"
+         target="_blank"
+         class="btn btn-success w-100 mb-2">
+        Cetak PDF
+      </a>
+
+      <a href="{{ url_for('kwitansi_create', id=invoice.id) }}"
+         class="btn btn-warning w-100">
+        Buat Kwitansi
+      </a>
+      {% else %}
+      <button class="btn btn-secondary w-100" disabled>
+        Isi SPO untuk Cetak
+      </button>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}

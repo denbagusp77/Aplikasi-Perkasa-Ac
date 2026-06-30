@@ -1,0 +1,95 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="card card-ghost p-4">
+  <h4 class="mb-3"><i class="bi bi-megaphone"></i> Blast Pesan ke Customer</h4>
+  <form method="POST" enctype="multipart/form-data">
+    <!-- Pesan -->
+    <div class="mb-3">
+      <label class="form-label">Pesan</label>
+      <textarea name="pesan" class="form-control" rows="3" required></textarea>
+    </div>
+
+    <!-- Upload File -->
+    <div class="mb-3">
+      <label class="form-label">Lampiran (opsional)</label>
+      <input type="file" name="file" class="form-control">
+      <small class="text-muted">Format didukung: JPG, PNG, PDF, MP4, dll</small>
+    </div>
+
+    <!-- Pilihan Customer -->
+    <div class="mb-3">
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>Pilih Customer</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBtn">
+          Pilih Semua
+        </button>
+      </label>
+
+      <div class="border p-3 bg-light rounded" style="max-height:300px; overflow-y:auto;">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input customer-check" type="checkbox" 
+                   name="customer_ids" value="{{ c.id }}" id="cust{{ c.id }}">
+            <label class="form-check-label" for="cust{{ c.id }}">
+              {{ c.nama }} — {{ c.nomor_wa or '-' }}
+            </label>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Tombol Kirim -->
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-send"></i> Kirim
+    </button>
+  </form>
+</div>
+
+<!-- Riwayat Blast -->
+<div class="card card-ghost p-4 mt-4">
+  <h5><i class="bi bi-clock-history"></i> Riwayat Blast</h5>
+  {% if blasts %}
+    <table class="table table-striped mt-3">
+      <thead>
+        <tr>
+          <th>Pesan</th>
+          <th>Targets</th>
+          <th>Status</th>
+          <th>Waktu</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in blasts %}
+          <tr>
+            <td>{{ b.message }}</td>
+            <td>{{ b.targets }}</td>
+            <td>
+              <span class="badge bg-{{ 'success' if b.status=='sent' else 'secondary' }}">
+                {{ b.status }}
+              </span>
+            </td>
+            <td>{{ b.created_at.strftime("%d-%m-%Y %H:%M") if b.created_at else '-' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="text-muted mt-2">Belum ada riwayat blast.</p>
+  {% endif %}
+</div>
+
+<!-- Script Pilih Semua -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const selectAllBtn = document.getElementById("selectAllBtn");
+  const checkboxes = document.querySelectorAll(".customer-check");
+
+  let allSelected = false;
+  selectAllBtn.addEventListener("click", function () {
+    allSelected = !allSelected;
+    checkboxes.forEach(cb => cb.checked = allSelected);
+    selectAllBtn.textContent = allSelected ? "Batal Pilih Semua" : "Pilih Semua";
+  });
+});
+</script>
+{% endblock %}

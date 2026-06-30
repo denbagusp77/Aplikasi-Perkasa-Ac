@@ -1,0 +1,62 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="card p-3">
+  <h4>Riwayat Service — {{ customer.nama }}</h4>
+  <table class="table table-bordered mt-3">
+    <thead>
+      <tr>
+        <th>Tanggal</th>
+        <th>Unit</th>
+        <th>Jenis</th>
+        <th>Teknisi</th>
+        <th>Team</th>
+        <th>Deskripsi</th>
+        <th>Status</th>
+        <th>Foto</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in all_services %}
+      <tr>
+        <td>{{ item.tanggal.strftime('%d-%m-%Y') if item.tanggal else '-' }}</td>
+        <td>{{ item.unit.merk }} ({{ item.unit.pk }} PK)</td>
+        <td>
+          {% if item.tipe == "Claim" %}
+            <span class="badge bg-warning text-dark">{{ item.jenis }}</span>
+          {% else %}
+            {{ item.jenis }}
+          {% endif %}
+        </td>
+        <td>{{ item.teknisi }}</td>
+        <td>{{ item.team }}</td>
+        <td>{{ item.deskripsi }}</td>
+        <td>
+          {% if item.tipe == "Claim" %}
+            <span class="badge bg-info">{{ item.status }}</span>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>
+          {% if item.foto %}
+            <a href="{{ url_for('static', filename=item.foto|replace('\\', '/')) }}" target="_blank">
+              <img src="{{ url_for('static', filename=item.foto|replace('\\', '/')) }}" style="max-height:80px;">
+            </a>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="8" class="text-center">Belum ada riwayat</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <a href="{{ url_for('units', cid=customer.id) }}" class="btn btn-secondary">
+    ⬅ Kembali
+  </a>
+</div>
+{% endblock %}

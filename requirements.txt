@@ -1,0 +1,7 @@
+Flask>=3.0
+Flask-Login
+Flask-SQLAlchemy
+pandas
+openpyxl
+requests
+weasyprint

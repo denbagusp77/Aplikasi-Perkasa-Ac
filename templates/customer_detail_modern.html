@@ -1,0 +1,90 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="container">
+
+  <!-- 🔙 Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Detail Customer</h3>
+    <a class="btn btn-outline-secondary" href="{{ url_for('customers') }}">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+  </div>
+
+  <!-- 🧾 Data Customer -->
+  <div class="card mb-3 p-3 shadow-sm">
+    <h5 class="mb-2">{{ customer.nama }}</h5>
+    <p><strong>No WA:</strong> {{ customer.nomor_wa }}</p>
+    <p><strong>Alamat:</strong> {{ customer.alamat }}</p>
+    <p><strong>Team:</strong> {{ customer.team }}</p>
+    <p><strong>Total Unit:</strong> {{ customer.units|length }}</p>
+  </div>
+
+  <!-- 📦 Data Unit -->
+  <div class="card mb-3 p-3 shadow-sm">
+    <h5 class="mb-3">Daftar Unit</h5>
+    {% if customer.units %}
+      <ul class="list-group list-group-flush">
+        {% for u in customer.units %}
+          <li class="list-group-item">
+            <strong>{{ u.merk }}</strong> - {{ u.lokasi }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">Belum ada unit</p>
+    {% endif %}
+  </div>
+
+  <!-- 📢 Riwayat Klaim -->
+  <div class="card mb-3 p-3 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">Riwayat Klaim</h5>
+      <a href="{{ url_for('claim.claim_new', customer_id=customer.id) }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-circle"></i> Tambah Klaim
+      </a>
+    </div>
+
+    {% if customer.claims %}
+      <table class="table table-sm table-hover">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Unit</th>
+            <th>Deskripsi</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in customer.claims %}
+          <tr>
+            <td>{{ c.tanggal.strftime('%d-%m-%Y') if c.tanggal else '-' }}</td>
+            <td>{{ c.unit.merk }} - {{ c.unit.lokasi if c.unit else '-' }}</td>
+            <td>{{ c.deskripsi }}</td>
+            <td>
+              {% if c.status == 'Selesai' %}
+                <span class="badge bg-success">Selesai</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Pending</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if c.status != 'Selesai' %}
+              <a href="{{ url_for('claim.claim_done', claim_id=c.id) }}" 
+                 class="btn btn-sm btn-success">✔ Selesai</a>
+              {% endif %}
+              <a href="{{ url_for('claim.claim_delete', claim_id=c.id) }}" 
+                 class="btn btn-sm btn-danger"
+                 onclick="return confirm('Yakin hapus klaim ini?')">🗑 Hapus</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">Belum ada klaim</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{
+  // Nonaktifkan format otomatis pada save untuk Python
+  "[python]": {
+    "editor.formatOnSave": false
+  },
+
+  // Pastikan provider pemformatan tidak menggunakan autoflake
+  "python.formatting.provider": "none",
+
+  // Jika extension autoflake terinstal, nonaktifkan
+  "editor.defaultFormatter": null,
+
+  // Tetap pertahankan pengaturan git Anda
+  "git.ignoreLimitWarning": true
+}

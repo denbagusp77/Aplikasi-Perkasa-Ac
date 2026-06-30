@@ -1,0 +1,110 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<h4 class="mb-3">Daftar Service Motor</h4>
+
+<form method="POST" action="{{ url_for('service_motor_tambah_ke_payroll') }}">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <a href="{{ url_for('service_motor_tambah') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle"></i> Tambah Service
+    </a>
+    <button type="submit" class="btn btn-success btn-sm">
+      <i class="bi bi-cash-coin"></i> Tambahkan ke Payroll
+    </button>
+  </div>
+
+  <table class="table table-bordered table-striped align-middle">
+    <thead class="table-primary">
+      <tr class="text-center">
+        <th><input type="checkbox" id="checkAll"></th>
+        <th>No</th>
+        <th>Tanggal</th>
+        <th>Teknisi</th>
+        <th>Total Biaya</th>
+        <th>Porsi Teknisi</th>
+        <th>Porsi Perusahaan</th>
+        <th>Keterangan</th>
+        <th>Status</th>
+        <th width="150">Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in services %}
+      <tr>
+        <td class="text-center">
+          {% if not s.payroll_id %}
+            <input type="checkbox" name="service_ids[]" value="{{ s.id }}">
+          {% endif %}
+        </td>
+
+        <td class="text-center">{{ loop.index }}</td>
+        <td>{{ s.tanggal.strftime('%d-%m-%Y') }}</td>
+        <td>{{ s.technician.nama }}</td>
+        <td>Rp {{ "{:,.0f}".format(s.total_biaya) }}</td>
+
+        <td class="text-success">
+          Rp {{ "{:,.0f}".format(s.porsi_teknisi) }}
+          <br>
+          <small class="text-muted">({{ s.persen_teknisi }}%)</small>
+        </td>
+
+        <td class="text-danger">
+          Rp {{ "{:,.0f}".format(s.porsi_perusahaan) }}
+          <br>
+          <small class="text-muted">({{ s.persen_perusahaan }}%)</small>
+        </td>
+
+        <td>{{ s.keterangan }}</td>
+
+        <td class="text-center">
+          {% if s.status == "Belum Dipotong" %}
+            <span class="badge bg-warning text-dark">Belum Dipotong</span>
+          {% else %}
+            <span class="badge bg-success">Sudah Dipotong</span>
+          {% endif %}
+        </td>
+
+        <td class="text-center">
+          {% if not s.payroll_id %}
+            <a href="{{ url_for('service_motor_edit_porsi', id=s.id) }}"
+               class="btn btn-warning btn-sm mb-1"
+               title="Edit Porsi">
+              ✏️
+            </a>
+          {% endif %}
+
+          <a href="{{ url_for('service_motor_riwayat', id=s.id) }}"
+             class="btn btn-info btn-sm mb-1"
+             title="Riwayat">
+            📜
+          </a>
+
+          {% if not s.payroll_id %}
+            <a href="{{ url_for('service_motor_hapus', id=s.id) }}"
+               class="btn btn-danger btn-sm"
+               onclick="return confirm('Hapus data ini?')"
+               title="Hapus">
+              🗑️
+            </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="10" class="text-center text-muted">
+          Belum ada data service motor.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+
+<script>
+document.getElementById('checkAll').addEventListener('change', function(e) {
+  document.querySelectorAll('input[name="service_ids[]"]').forEach(cb => {
+    cb.checked = e.target.checked;
+  });
+});
+</script>
+
+{% endblock %}

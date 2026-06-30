@@ -1,0 +1,27 @@
+{% extends "base_modern.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h3 class="mb-4">Edit Rekening Bank</h3>
+
+    <form method="POST" class="card p-4 shadow-sm">
+        <div class="mb-3">
+            <label class="form-label">Nama Bank</label>
+            <input type="text" name="bank_name" value="{{ bank.bank_name }}" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Nama Pemilik Rekening</label>
+            <input type="text" name="account_name" value="{{ bank.account_name }}" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Nomor Rekening</label>
+            <input type="text" name="account_number" value="{{ bank.account_number }}" class="form-control" required>
+        </div>
+
+        <button class="btn btn-primary w-100">Perbarui</button>
+    </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,96 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Jasa AC - Modern</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background:#f5f7fb; min-height:100vh; padding-top:70px; }
+    .card-ghost { background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%); border-radius:12px; box-shadow: 0 6px 18px rgba(23,23,23,0.06); }
+    .brand { font-weight:700; letter-spacing:0.3px; }
+
+    
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top border-bottom shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand brand" href="{{ url_for('dashboard') }}"><i class="bi bi-wind"></i> PERKASA AC</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('customers') }}">Customers</a></li>
+        <li class="nav-item">
+  <a class="nav-link" href="{{ url_for('reminders_auto') }}">
+    <i class="bi bi-bell"></i> Auto Reminders
+  </a>
+</li>
+<li class="nav-item dropdown">
+  <a class="nav-link dropdown-toggle" href="#" id="financeMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Laporan Keuangan
+  </a>
+  <ul class="dropdown-menu" aria-labelledby="financeMenu">
+    <li><a class="dropdown-item" href="{{ url_for('transactions') }}">📑 Transaksi</a></li>
+    <li><a class="dropdown-item" href="{{ url_for('laba_rugi') }}">📊 Laba Rugi Bulanan</a></li>
+    <li><a class="dropdown-item" href="{{ url_for('arus_kas') }}">💰 Arus Kas Bulanan</a></li>
+  </ul>
+</li>
+  <li class="nav-item dropdown">
+  <a class="nav-link dropdown-toggle" href="#" id="employeeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    👥 Karyawan
+  </a>
+  <ul class="dropdown-menu" aria-labelledby="employeeDropdown">
+    <li><a class="dropdown-item" href="{{ url_for('employees') }}">Data Karyawan</a></li>
+    <li><a class="dropdown-item" href="{{ url_for('attendance_report') }}">Absensi</a></li>
+    <a class="dropdown-item" href="{{ url_for('kasbon_list') }}">Kasbon</a>
+    <li class="nav-item">
+      <a class="nav-link" href="{{ url_for('service_motor_list') }}">
+        <i class="bi bi-tools"></i> Service Motor
+      </a>
+    </li>
+
+    <li><a class="dropdown-item" href="{{ url_for('payroll_index') }}">💰 Gaji & Payroll</a></li>
+
+
+    
+  </ul>
+</li>
+
+
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('settings') }}">Settings</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('blast') }}">Blast</a></li>
+        <li class="nav-item">
+  <a class="nav-link" href="{{ url_for('analytics_cuci') }}">
+    📊 Analisa
+  </a>
+</li>
+
+
+      </ul>
+
+      <div class="d-flex align-items-center">
+        {% if current_user.is_authenticated %}
+        <div class="me-3 text-muted">Hi, {{ current_user.username }}</div>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Logout</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="container mt-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat,msg in messages %}
+        <div class="alert alert-{{cat}} alert-dismissible fade show" role="alert">{{msg}}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

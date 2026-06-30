@@ -1,0 +1,132 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="card card-ghost p-3">
+  <h5>📋 Pricelist</h5>
+
+  <!-- Filter -->
+  <form method="get" action="{{ url_for('settings') }}" class="d-flex mb-3">
+    <select name="kategori" id="filterKategori" class="form-select w-auto me-2">
+      <option value="">Semua Kategori</option>
+      <option value="Service" {% if kategori=="Service" %}selected{% endif %}>Service</option>
+      <option value="Package" {% if kategori=="Package" %}selected{% endif %}>Package</option>
+    </select>
+    <input type="text" id="searchInput" name="q" class="form-control me-2" placeholder="Cari nama..." value="{{ q }}">
+    <button class="btn btn-primary">Tampilkan</button>
+  </form>
+
+  <!-- Tabel Pricelist -->
+  <table class="table table-striped align-middle" id="pricelistTable">
+    <thead class="table-light">
+      <tr>
+        <th>Nama</th>
+        <th>Kategori</th>
+        <th>Harga</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for item in pricelist %}
+      <tr data-kategori="{{ item.kategori }}">
+        <form method="post" action="{{ url_for('pricelist_update', kategori=item.kategori, id=item.id) }}">
+          <td>
+            <input type="text" name="nama" value="{{ item.nama }}" class="form-control form-control-sm">
+          </td>
+          <td>
+            <span class="badge {% if item.kategori=='Service' %}bg-primary{% else %}bg-success{% endif %}">
+              {{ item.kategori }}
+            </span>
+          </td>
+          <td>
+            <input type="text" name="harga" 
+                   value="Rp {{ '{:,.0f}'.format(item.harga) }}" 
+                   class="form-control form-control-sm harga-input">
+          </td>
+          <td class="d-flex">
+            <button class="btn btn-sm btn-success me-1">✔</button>
+        </form>
+        <form method="post" action="{{ url_for('pricelist_delete', kategori=item.kategori, id=item.id) }}">
+  <button class="btn btn-sm btn-danger">🗑</button>
+</form>
+
+          </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- JS format Rupiah -->
+  <script>
+  document.querySelectorAll('.harga-input').forEach(function(input) {
+    input.addEventListener('input', function() {
+      let value = this.value.replace(/\D/g, ''); // ambil hanya angka
+      if(value){
+        this.value = 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
+      } else {
+        this.value = '';
+      }
+    });
+  });
+
+  // sebelum submit form, hapus Rp dan titik
+  document.querySelectorAll('form').forEach(function(form){
+    form.addEventListener('submit', function(){
+      form.querySelectorAll('.harga-input').forEach(function(input){
+        input.value = input.value.replace(/\D/g,''); // simpan hanya angka murni
+      });
+    });
+  });
+  </script>
+
+  <!-- Form Tambah Pricelist -->
+  <hr>
+  <form method="post" action="{{ url_for('pricelist_new') }}" class="row g-2">
+    <div class="col-md-4">
+      <input name="nama" class="form-control" placeholder="Nama" required>
+    </div>
+    <div class="col-md-3">
+      <select name="kategori" class="form-select" required>
+        <option>Service</option>
+        <option>Package</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <input name="harga" type="text" class="form-control harga-input" placeholder="Rp 0" required>
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary w-100">+ Tambah</button>
+    </div>
+  </form>
+</div>
+
+<!-- Technicians -->
+  <div class="col-md-4">
+    <div class="card shadow-sm p-3">
+      <h5 class="mb-3">👨‍🔧 Technicians</h5>
+      <ul class="list-group mb-2">
+        {% for t in technicians %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            {{ t.nama }} <span class="text-muted">({{ t.team }})</span>
+            <span class="badge bg-info ms-2">+{{ (t.markup*100)|round(0) }}%</span>
+          </div>
+          <form method="post" action="{{ url_for('tech_delete', id=t.id) }}" class="d-inline">
+            <button class="btn btn-sm btn-danger">🗑️</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{{ url_for('tech_new') }}" class="row g-2">
+        <div class="col-4"><input name="nama" class="form-control" placeholder="Nama teknisi"></div>
+        <div class="col-4">
+          <select name="team" class="form-select">
+            <option>Internal</option>
+            <option>Eksternal</option>
+          </select>
+        </div>
+        <div class="col-4"><input type="number" step="0.01" name="markup" class="form-control" placeholder="0.28"></div>
+        <div class="col-12"><button class="btn btn-primary w-100">+ Tambah Teknisi</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

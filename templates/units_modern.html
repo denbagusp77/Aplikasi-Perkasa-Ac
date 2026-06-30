@@ -1,0 +1,182 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3 class="fw-bold text-primary"><i class="bi bi-cpu"></i> Units — {{ customer.nama }}</h3>
+  <a href="{{ url_for('customers') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Kembali
+  </a>
+</div>
+
+<!-- 🔍 FILTER -->
+<div class="card card-ghost p-3 mb-4">
+  <form method="get" class="row g-3 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Merk</label>
+      <input type="text" name="merk" class="form-control" placeholder="Contoh: LG" value="{{ merk }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label fw-semibold">PK</label>
+      <select name="pk" class="form-select">
+        <option value="">-- Semua PK --</option>
+        <option value="1/2" {{ 'selected' if pk=='1/2' else '' }}>1/2</option>
+        <option value="1" {{ 'selected' if pk=='1' else '' }}>1</option>
+        <option value="2" {{ 'selected' if pk=='2' else '' }}>2</option>
+        <option value="2.5" {{ 'selected' if pk=='2.5' else '' }}>2.5</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Tanggal Service</label>
+      <input type="date" name="tanggal" class="form-control" value="{{ tanggal }}">
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary w-100"><i class="bi bi-search"></i> Filter</button>
+    </div>
+    <div class="col-md-2">
+      <a href="{{ url_for('units', cid=customer.id) }}" class="btn btn-outline-secondary w-100">
+        <i class="bi bi-x-circle"></i> Reset
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- ➕ TAMBAH UNIT -->
+<div class="card card-ghost p-3 mb-4">
+  <h5 class="fw-semibold mb-3 text-success"><i class="bi bi-plus-circle"></i> Tambah Unit</h5>
+  <form method="post" action="{{ url_for('units_new', cid=customer.id) }}" class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">Nama Ruangan</label>
+      <input name="ruangan" class="form-control" placeholder="Contoh: Ruang Meeting, Lobby">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Merk</label>
+      <input name="merk" class="form-control" placeholder="Contoh: LG, Panasonic">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">PK</label>
+      <input name="pk" class="form-control" placeholder="1/2, 1, 2">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Jumlah</label>
+      <input name="jumlah_unit" type="number" value="1" min="1" class="form-control">
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-success w-100"><i class="bi bi-save"></i> Simpan</button>
+    </div>
+  </form>
+</div>
+
+<!-- 📋 DAFTAR UNIT -->
+<div class="card card-ghost p-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-semibold mb-0"><i class="bi bi-list-check"></i> Daftar Unit</h5>
+    <a class="btn btn-info" href="{{ url_for('unit_history_all', cid=customer.id) }}">
+      <i class="bi bi-clock-history"></i> Detail Riwayat
+    </a>
+  </div>
+
+  <table class="table align-middle table-hover">
+    <thead class="table-light">
+      <tr>
+        <th>Ruangan</th>
+        <th>Merk</th>
+        <th>PK</th>
+        <th>Jumlah</th>
+        <th style="width:60%">Riwayat Service</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in units %}
+      <tr>
+        <td><strong>{{ u.ruangan or '-' }}</strong></td>
+        <td>
+          <strong>{{ u.merk }}</strong>
+          <a href="{{ url_for('unit_edit', uid=u.id) }}" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-pencil"></i></a>
+          <form method="post" action="{{ url_for('units_delete', uid=u.id) }}"
+                class="d-inline-block ms-1" onsubmit="return confirm('Hapus unit ini beserta semua servicenya?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+        <td>{{ u.pk }}</td>
+        <td>
+          {% if u.jumlah_unit %}
+            <span class="badge bg-primary">{{ u.jumlah_unit }} Unit</span>
+          {% else %}
+            <span class="text-muted">-</span>
+          {% endif %}
+        </td>
+        <td>
+          <!-- Tombol Tambah Service -->
+          <div class="mb-2 text-end">
+            <a href="{{ url_for('service_new', unit_id=u.id) }}" class="btn btn-sm btn-success">
+              <i class="bi bi-plus-lg"></i> Tambah Service
+            </a>
+          </div>
+
+          {% if u.services %}
+            {% for s in u.services %}
+            <div class="p-2 border rounded bg-light mb-2 shadow-sm">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <input type="checkbox" name="services" value="{{ s.id }}" form="invoice-form" class="form-check-input me-2">
+                  <i class="bi bi-calendar3"></i> {{ s.tanggal }}
+                </div>
+                <small class="text-muted">
+                  Rp {{ "{:,.0f}".format((s.harga_satuan or 0) * (s.jumlah or 1)) }}
+                  <span class="small text-muted">({{ s.jumlah or 1 }} × {{ "{:,.0f}".format(s.harga_satuan or 0) }})</span>
+                </small>
+              </div>
+
+              <!-- Badges -->
+              <div class="mb-1 mt-1">
+                <span class="badge bg-info text-dark">{{ s.jenis_service }}</span>
+                {% if s.paket_cuci %}<span class="badge bg-success">{{ s.paket_cuci }}</span>{% endif %}
+                {% if s.technician %}
+                  <span class="badge bg-warning text-dark">{{ s.technician.nama }} ({{ s.technician.team }})</span>
+                {% elif s.teknisi %}
+                  <span class="badge bg-warning text-dark">{{ s.teknisi }}</span>
+                {% endif %}
+              </div>
+
+              <!-- Tombol aksi -->
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('service_edit', id=s.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+                <form method="post" action="{{ url_for('service_delete', id=s.id) }}" onsubmit="return confirm('Hapus service ini?')">
+                  <button class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                </form>
+                {% if (current_date - s.tanggal).days <= 30 %}
+                  <a href="{{ url_for('claim_service', unit_id=u.id, service_id=s.id) }}" class="btn btn-sm btn-warning">
+                    <i class="bi bi-flag"></i>
+                  </a>
+                {% else %}
+                  <button class="btn btn-sm btn-secondary" disabled>Claim Expired</button>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <span class="text-muted fst-italic">Belum ada service</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- 🔧 Aksi Global -->
+  <div class="d-flex justify-content-between align-items-center mt-4">
+    <form method="post" action="{{ url_for('units_delete_all', cid=customer.id) }}"
+          onsubmit="return confirm('Hapus SEMUA unit dan servicenya?')" class="mb-0">
+      <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Hapus Semua</button>
+    </form>
+
+    <form id="invoice-form" method="post" action="{{ url_for('invoice_generate', cid=customer.id) }}">
+      <button class="btn btn-primary btn-lg"><i class="bi bi-receipt"></i> Buat Invoice</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base_modern.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h3 class="mb-4">Master Rekening Bank</h3>
+
+    <a href="{{ url_for('bank_account_add') }}" class="btn btn-primary mb-3">
+        <i class="bi bi-plus-circle"></i> Tambah Rekening
+    </a>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Bank</th>
+                        <th>Nama Rekening</th>
+                        <th>No. Rekening</th>
+                        <th class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bank in banks %}
+                    <tr>
+                        <td>{{ bank.id }}</td>
+                        <td>{{ bank.bank_name }}</td>
+                        <td>{{ bank.account_name }}</td>
+                        <td>{{ bank.account_number }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('bank_account_edit', id=bank.id) }}" class="btn btn-sm btn-outline-warning">
+                                Edit
+                            </a>
+
+                            <form action="{{ url_for('bank_account_delete', id=bank.id) }}"
+                                  method="POST" class="d-inline"
+                                  onsubmit="return confirm('Yakin ingin menghapus rekening ini?')">
+                                <button class="btn btn-sm btn-outline-danger">Hapus</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-3 text-muted">
+                            Belum ada data rekening bank.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h3>Tambah Transaksi</h3>
+  <form method="POST">
+    
+    <!-- Tanggal -->
+    <div class="mb-3">
+      <label class="form-label">Tanggal</label>
+      <input type="date" name="tanggal" class="form-control" required />
+    </div>
+
+    <!-- Kategori -->
+    <div class="mb-3">
+      <label class="form-label">Kategori</label>
+      <select name="kategori" class="form-control" required>
+        <option value="Pendapatan">Pendapatan</option>
+        <option value="Beban">Beban</option>
+      </select>
+    </div>
+
+    <!-- Jenis Transaksi -->
+    <div class="mb-3">
+      <label class="form-label">Jenis</label>
+      <input
+        type="text"
+        name="jenis"
+        class="form-control"
+        placeholder="Contoh: Cuci AC, Bongkar, Sparepart"
+        required
+      />
+    </div>
+
+    <!-- Teknisi -->
+    <div class="mb-3">
+      <label class="form-label">Teknisi</label>
+      <select name="technician_id" class="form-control">
+        <option value="">-- Pilih Teknisi --</option>
+        {% for t in teknisi_all %}
+          <option value="{{ t.id }}">{{ t.nama }} ({{ t.team }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Deskripsi -->
+    <div class="mb-3">
+      <label class="form-label">Deskripsi</label>
+      <textarea
+        name="deskripsi"
+        class="form-control"
+        placeholder="Detail transaksi"
+        required
+      ></textarea>
+    </div>
+
+    <!-- Jumlah -->
+    <div class="mb-3">
+      <label class="form-label">Jumlah (Rp)</label>
+      <input
+        type="number"
+        step="0.01"
+        name="jumlah"
+        class="form-control"
+        required
+      />
+    </div>
+
+    <!-- Tombol Aksi -->
+    <button type="submit" class="btn btn-success">💾 Simpan</button>
+    <a href="{{ url_for('transactions') }}" class="btn btn-secondary">Batal</a>
+  </form>
+</div>
+{% endblock %}

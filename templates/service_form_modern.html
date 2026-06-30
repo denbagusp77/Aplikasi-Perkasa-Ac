@@ -1,0 +1,246 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="card card-ghost p-3">
+  <h4>
+    {% if service %}
+      Edit Service - {{ unit.customer.nama }} / {{ unit.merk }}
+    {% else %}
+      Tambah Service - {{ unit.customer.nama }} / {{ unit.merk }}
+    {% endif %}
+  </h4>
+
+  <form method="post">
+    <!-- 📅 Tanggal Service -->
+    <div class="mb-3">
+      <label>Tanggal Service</label>
+      <input type="date" name="tanggal" class="form-control"
+             value="{{ service.tanggal.strftime('%Y-%m-%d') if service.tanggal else '' }}">
+    </div>
+
+    <!-- 📅 Tanggal Cuci Berikutnya -->
+    <div class="mb-3">
+      <label>Tanggal Cuci Berikutnya</label>
+      <input type="date" name="tanggal_cuci_berikutnya" class="form-control"
+             value="{{ default_tcb.strftime('%Y-%m-%d') if default_tcb else '' }}">
+    </div>
+
+    <!-- 🔹 Satu Row Service (EDIT MODE) -->
+    {% if service %}
+    <div class="row service-row g-2 align-items-end">
+      <div class="col-md-3">
+        <label>Jenis Service</label>
+        <select name="jenis_service" class="form-select jenis-service">
+          <option value="">-- Pilih --</option>
+          {% for st in service_types %}
+          <option value="{{ st.nama }}" data-harga="{{ st.harga }}"
+                  {% if service.jenis_service==st.nama %}selected{% endif %}>
+            {{ st.nama }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3 paket-cuci {% if not service.paket_cuci %}d-none{% endif %}">
+        <label>Paket Cuci</label>
+        <select name="paket_cuci" class="form-select paket-select">
+          <option value="">-- Pilih --</option>
+          {% for p in packages %}
+          <option value="{{ p.nama }}" data-harga="{{ p.harga }}"
+                  {% if service.paket_cuci==p.nama %}selected{% endif %}>
+            {{ p.nama }} - Rp {{ "{:,.0f}".format(p.harga) }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label>Harga</label>
+        <input type="number" step="any" name="harga_satuan" class="form-control harga"
+               value="{{ service.harga_satuan or 0 }}">
+      </div>
+
+      <div class="col-md-1">
+        <label>Qty</label>
+        <input type="number" name="jumlah" class="form-control qty"
+               value="{{ service.jumlah or 1 }}" min="1">
+      </div>
+
+      <div class="col-md-2">
+        <label>Subtotal</label>
+        <input type="text" readonly class="form-control subtotal"
+               value="{{ (service.harga_satuan or 0) * (service.jumlah or 1) }}">
+      </div>
+
+      <div class="col-md-3">
+        <label>Deskripsi</label>
+        <input type="text" name="deskripsi" class="form-control"
+               value="{{ service.deskripsi or '' }}">
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 🔹 Multi-row container (TAMBAH MODE) -->
+    {% if not service %}
+    <div id="services-container"></div>
+    <button type="button" id="addServiceBtn" class="btn btn-outline-primary mt-2">
+      + Tambah Service
+    </button>
+    {% endif %}
+
+    <!-- 🔹 Teknisi -->
+    <div class="mt-3">
+      <label>Teknisi</label>
+      <select name="technician_id" id="teknisiSelect" class="form-select">
+        <option value="">-- Pilih Teknisi --</option>
+        {% for t in technicians %}
+        <option value="{{ t.id }}" data-markup="{{ t.markup or 0 }}"
+                {% if service.technician_id==t.id %}selected{% endif %}>
+          {{ t.nama }} ({{ t.team }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- 🔹 Pembayaran -->
+    <div class="mt-3">
+      <label>Pembayaran</label>
+      <select name="pembayaran" class="form-select">
+        <option value="Belum Lunas" {% if service.pembayaran=='Belum Lunas' %}selected{% endif %}>Belum Lunas</option>
+        <option value="Lunas" {% if service.pembayaran=='Lunas' %}selected{% endif %}>Lunas</option>
+      </select>
+    </div>
+
+    <div class="mt-3">
+      <button type="submit" class="btn btn-primary">Simpan</button>
+    </div>
+  </form>
+</div>
+
+<!-- ======================== JAVASCRIPT ======================== -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const teknisiSelect = document.getElementById("teknisiSelect");
+  const tglServiceInput = document.querySelector("input[name='tanggal']");
+  const tglBerikutnyaInput = document.querySelector("input[name='tanggal_cuci_berikutnya']");
+
+  // 🔹 Auto isi tanggal cuci berikutnya (+3 bulan)
+  if (tglServiceInput && tglBerikutnyaInput) {
+    tglServiceInput.addEventListener("change", function() {
+      const val = this.value;
+      if (!val) return;
+      const tanggal = new Date(val);
+      if (isNaN(tanggal)) return;
+      tanggal.setMonth(tanggal.getMonth() + 3);
+      tglBerikutnyaInput.value = tanggal.toISOString().split("T")[0];
+    });
+  }
+
+  function updateSubtotal(row) {
+    const harga = parseFloat(row.querySelector(".harga").value || 0);
+    const qty = parseInt(row.querySelector(".qty").value || 1);
+    row.querySelector(".subtotal").value = harga * qty;
+  }
+
+  function applyMarkup(row) {
+    const jenis = row.querySelector(".jenis-service");
+    const paket = row.querySelector(".paket-select");
+    let baseHarga = 0;
+    if (paket && !paket.closest(".paket-cuci").classList.contains("d-none") && paket.value) {
+      baseHarga = parseFloat(paket.selectedOptions[0]?.dataset.harga || 0);
+    } else if (jenis && jenis.value) {
+      baseHarga = parseFloat(jenis.selectedOptions[0]?.dataset.harga || 0);
+    }
+    const markup = parseFloat(teknisiSelect?.selectedOptions[0]?.dataset.markup || 0);
+    let finalHarga = baseHarga;
+    if (markup > 1) finalHarga = baseHarga * (markup / 100);
+    else if (markup > 0) finalHarga = baseHarga * markup;
+    const hargaInput = row.querySelector(".harga");
+    if (!isNaN(finalHarga) && finalHarga > 0) hargaInput.value = Math.round(finalHarga);
+    updateSubtotal(row);
+  }
+
+  function bindRowEvents(row) {
+    const jenis = row.querySelector(".jenis-service");
+    const paketDiv = row.querySelector(".paket-cuci");
+    const paket = row.querySelector(".paket-select");
+    const qty = row.querySelector(".qty");
+    const harga = row.querySelector(".harga");
+
+    if (jenis) {
+      jenis.addEventListener("change", () => {
+        if (jenis.value.toLowerCase().includes("cuci")) paketDiv.classList.remove("d-none");
+        else paketDiv.classList.add("d-none");
+        applyMarkup(row);
+      });
+    }
+    if (paket) paket.addEventListener("change", () => applyMarkup(row));
+    if (qty) qty.addEventListener("input", () => updateSubtotal(row));
+    if (harga) harga.addEventListener("input", () => updateSubtotal(row));
+  }
+
+  if (teknisiSelect) {
+    teknisiSelect.addEventListener("change", () => {
+      document.querySelectorAll(".service-row").forEach(r => applyMarkup(r));
+    });
+  }
+
+  // Bind existing rows (edit)
+  document.querySelectorAll(".service-row").forEach(r => bindRowEvents(r));
+
+  // Add row (for tambah mode)
+  {% if not service %}
+  const addBtn = document.getElementById("addServiceBtn");
+  const container = document.getElementById("services-container");
+  addBtn.addEventListener("click", () => {
+    const idx = document.querySelectorAll(".service-row").length;
+    const row = document.createElement("div");
+    row.className = "service-row border p-3 mb-2 rounded bg-light";
+    row.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">Jenis Service</label>
+          <select name="jenis_service_${idx}" class="form-select jenis-service">
+            <option value="">-- Pilih --</option>
+            {% for st in service_types %}
+            <option value="{{ st.nama }}" data-harga="{{ st.harga }}">{{ st.nama }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2 paket-cuci d-none">
+          <label class="form-label">Paket Cuci</label>
+          <select name="paket_cuci_${idx}" class="form-select paket-select">
+            <option value="">-- Pilih Paket --</option>
+            {% for p in packages %}
+            <option value="{{ p.nama }}" data-harga="{{ p.harga }}">{{ p.nama }} - Rp {{ "{:,.0f}".format(p.harga) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Harga</label>
+          <input type="number" name="harga_${idx}" class="form-control harga" value="0">
+        </div>
+        <div class="col-md-1">
+          <label class="form-label">Qty</label>
+          <input type="number" name="jumlah_${idx}" class="form-control qty" value="1" min="1">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Subtotal</label>
+          <input type="text" class="form-control subtotal" readonly value="0">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Deskripsi</label>
+          <input type="text" name="deskripsi_${idx}" class="form-control deskripsi" placeholder="Keterangan">
+        </div>
+        <div class="col-md-12 text-end">
+          <button type="button" class="btn btn-danger mt-2 remove-btn"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>`;
+    row.querySelector(".remove-btn").addEventListener("click", () => row.remove());
+    container.appendChild(row);
+    bindRowEvents(row);
+  });
+  addBtn.click(); // row pertama otomatis
+  {% endif %}
+});
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>
+    {% if mode == 'add' %}
+    <i class="bi bi-person-plus"></i> Tambah Karyawan
+    {% else %}
+    <i class="bi bi-pencil-square"></i> Edit Karyawan
+    {% endif %}
+  </h3>
+  <a href="{{ url_for('employees') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Kembali
+  </a>
+</div>
+
+<div class="card shadow-sm rounded-3">
+  <div class="card-body">
+    <!-- 🔹 enctype wajib agar bisa upload file -->
+    <form method="POST" enctype="multipart/form-data">
+      <div class="row g-3">
+        <!-- ==================== DATA DASAR ==================== -->
+        <div class="col-md-6">
+          <label class="form-label">Nama</label>
+          <input type="text" name="nama" class="form-control" required
+                 value="{{ emp.nama if emp else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Team</label>
+          <input type="text" name="team" class="form-control"
+                 value="{{ emp.team if emp else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Jabatan</label>
+          <input type="text" name="jabatan" class="form-control"
+                 value="{{ emp.jabatan if emp else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Nomor HP</label>
+          <input type="text" name="no_hp" class="form-control"
+                 value="{{ emp.no_hp if emp else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Tanggal Masuk</label>
+          <input type="date" name="tanggal_masuk" class="form-control"
+                 value="{{ emp.tanggal_masuk.strftime('%Y-%m-%d') if emp.tanggal_masuk else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="Aktif" {% if emp and emp.status == 'Aktif' %}selected{% endif %}>Aktif</option>
+            <option value="Tidak Aktif" {% if emp and emp.status == 'Tidak Aktif' %}selected{% endif %}>Tidak Aktif</option>
+          </select>
+        </div>
+
+        <!-- ==================== GAJI & KOMISI ==================== -->
+        <div class="col-md-6">
+          <label class="form-label">Gaji Pokok</label>
+          <input type="number" name="gaji_pokok" class="form-control"
+                 value="{{ emp.gaji_pokok if emp else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Markup / Komisi (%)</label>
+          <input type="number" step="0.01" name="markup" class="form-control"
+                 value="{{ emp.markup if emp else '0.28' }}">
+        </div>
+
+        <!-- ==================== ALAMAT & CATATAN ==================== -->
+        <div class="col-12">
+          <label class="form-label">Alamat</label>
+          <textarea name="alamat" class="form-control" rows="2">{{ emp.alamat if emp else '' }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Catatan</label>
+          <textarea name="catatan" class="form-control" rows="2">{{ emp.catatan if emp else '' }}</textarea>
+        </div>
+
+        <!-- ==================== FOTO ==================== -->
+        <div class="col-md-6">
+          <label class="form-label">Foto Karyawan</label>
+          {% if emp and emp.foto %}
+            <div class="mb-2">
+              <img src="{{ url_for('static', filename='uploads/' ~ emp.foto) }}"
+                   alt="Foto {{ emp.nama }}" class="img-thumbnail" style="max-height: 150px;">
+            </div>
+          {% endif %}
+          <input type="file" name="foto" accept="image/*" class="form-control">
+          <small class="text-muted">Upload foto baru (opsional)</small>
+        </div>
+
+        <!-- ==================== DOKUMEN ==================== -->
+        <div class="col-md-6">
+          <label class="form-label">Dokumen (KTP, Kontrak, dsb)</label>
+          {% if emp and emp.dokumen %}
+            <div class="mb-2">
+              <a href="{{ url_for('static', filename='uploads/' ~ emp.dokumen) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-file-earmark-text"></i> Lihat Dokumen Lama
+              </a>
+            </div>
+          {% endif %}
+          <input type="file" name="dokumen" class="form-control">
+          <small class="text-muted">Upload file baru (PDF / DOC / Gambar)</small>
+        </div>
+      </div>
+
+      <div class="mt-4 text-end">
+        <button type="submit" class="btn btn-success px-4">
+          <i class="bi bi-check-lg"></i> Simpan
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

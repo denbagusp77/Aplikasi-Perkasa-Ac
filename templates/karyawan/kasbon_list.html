@@ -1,0 +1,176 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">📋 Daftar Kasbon</h4>
+    <a href="{{ url_for('kasbon_tambah') }}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Tambah Kasbon
+    </a>
+  </div>
+
+ 
+      {% for category, msg in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+   
+
+
+  <div class="card shadow-sm border-0 mb-3">
+  <div class="card-body">
+    <form method="get" action="{{ url_for('kasbon_list') }}" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">Bulan</label>
+        <select name="bulan" class="form-select">
+          <option value="">Semua</option>
+          {% for b in range(1, 13) %}
+            <option value="{{ b }}" {% if bulan and bulan|int == b %}selected{% endif %}>
+              {{ b }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Tahun</label>
+        <select name="tahun" class="form-select">
+          <option value="">Semua</option>
+          {% for t in range(2024, 2031) %}
+            <option value="{{ t }}" {% if tahun and tahun|int == t %}selected{% endif %}>
+              {{ t }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Teknisi</label>
+        <select name="teknisi_id" class="form-select">
+          <option value="all">Semua</option>
+          {% for t in teknisis %}
+            <option value="{{ t.id }}" {% if teknisi_id and teknisi_id|int == t.id %}selected{% endif %}>
+              {{ t.nama }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-funnel"></i> Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      {% if kasbons %}
+      <form id="kasbonForm" method="POST" action="{{ url_for('kasbon_tambah_ke_payroll') }}">
+        <table class="table table-bordered align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="text-center"><input type="checkbox" id="selectAll"></th>
+              <th>Tanggal</th>
+              <th>Teknisi</th>
+              <th>Jumlah</th>
+              <th>Keterangan</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for k in kasbons %}
+            <tr>
+              <td class="text-center">
+                <input 
+                  type="checkbox" 
+                  class="kasbon-checkbox" 
+                  name="kasbon_ids[]" 
+                  value="{{ k.id }}"
+                  {% if k.terpilih %}checked{% endif %}
+                >
+              </td>
+              <td>{{ k.tanggal.strftime('%d-%m-%Y') }}</td>
+              <td>
+                <a href="{{ url_for('kasbon_detail', technician_id=k.technician_id) }}" class="text-decoration-none fw-semibold">
+                  {{ k.technician.nama }}
+                </a>
+              </td>
+              <td>Rp {{ '{:,.0f}'.format(k.jumlah) }}</td>
+              <td>{{ k.keterangan or '-' }}</td>
+              <td>
+                {% if k.status == 'Lunas' %}
+                  <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Lunas</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i> Belum Lunas</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <a href="{{ url_for('kasbon_hapus', id=k.id) }}" 
+                   class="btn btn-danger btn-sm"
+                   onclick="return confirm('Yakin ingin menghapus kasbon ini?');">
+                  <i class="bi bi-trash"></i> Hapus
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <h5>Total Kasbon Terpilih: <span id="totalKasbon" class="text-primary">Rp 0</span></h5>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-wallet2"></i> Tambahkan Kasbon ke Payroll
+          </button>
+        </div>
+      </form>
+      {% else %}
+        <p class="text-muted text-center">Belum ada data kasbon.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  const checkboxes = document.querySelectorAll('.kasbon-checkbox');
+  const selectAll = document.getElementById('selectAll');
+  const totalKasbon = document.getElementById('totalKasbon');
+
+  function formatRupiah(angka) {
+    return "Rp " + angka.toLocaleString("id-ID");
+  }
+
+  function updateTotal() {
+    let total = 0;
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        const jumlah = parseFloat(cb.closest('tr').querySelector('td:nth-child(4)').innerText.replace(/[^\d]/g, ""));
+        total += jumlah;
+      }
+    });
+    totalKasbon.textContent = formatRupiah(total);
+  }
+
+  checkboxes.forEach(cb => cb.addEventListener('change', updateTotal));
+  selectAll.addEventListener('change', () => {
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateTotal();
+  });
+
+  updateTotal(); // inisialisasi awal
+
+  // Validasi sebelum submit
+document.getElementById('kasbonForm').addEventListener('submit', function (e) {
+  const selected = Array.from(checkboxes).filter(cb => cb.checked).length;
+  if (selected === 0) {
+    e.preventDefault();
+    alert("Pilih minimal satu kasbon sebelum menambahkan ke payroll!");
+  }
+});
+
+</script>
+{% endblock %}

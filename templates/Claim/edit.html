@@ -1,0 +1,31 @@
+{% extends "base_modern.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3 class="fw-bold text-primary">
+    <i class="bi bi-pencil-square me-2"></i> Edit Klaim
+  </h3>
+  <a href="{{ url_for('claim_list', customer_id=claim.customer_id) }}" 
+     class="btn btn-outline-secondary rounded-pill">
+    <i class="bi bi-arrow-left"></i> Kembali
+  </a>
+</div>
+
+<div class="card-glass rounded-4 p-4 shadow-sm">
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Deskripsi</label>
+      <textarea class="form-control" name="deskripsi" rows="4">{{ claim.deskripsi }}</textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Status</label>
+      <select class="form-select" name="status">
+        <option value="pending" {% if claim.status == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="done" {% if claim.status == 'done' %}selected{% endif %}>Selesai</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary rounded-pill">Simpan Perubahan</button>
+  </form>
+</div>
+
+{% endblock %}

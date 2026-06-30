@@ -1,0 +1,14 @@
+
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="card card-ghost p-3">
+  <h4>{{ 'Edit' if customer else 'Tambah' }} Customer</h4>
+  <form method="post" class="row g-3">
+    <div class="col-md-6"><label class="form-label">Nama</label><input name="nama" class="form-control" required value="{{ customer.nama if customer else '' }}"></div>
+    <div class="col-md-6"><label class="form-label">No WA</label><input name="nomor_wa" class="form-control" value="{{ customer.nomor_wa if customer else '' }}"></div>
+    <div class="col-12"><label class="form-label">Alamat</label><input name="alamat" class="form-control" value="{{ customer.alamat if customer else '' }}"></div>
+    <div class="col-md-4"><label class="form-label">Team</label><select name="team" class="form-select"><option value="">--</option><option value="Internal" {% if customer and customer.team=='Internal' %}selected{% endif %}>Internal</option><option value="Eksternal" {% if customer and customer.team=='Eksternal' %}selected{% endif %}>Eksternal</option></select></div>
+    <div class="col-12"><button class="btn btn-primary">Simpan</button></div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends "base_modern.html" %}
+{% block content %}
+
+<div class="container mt-4">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+
+```
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+    <div>
+      <h4 class="fw-bold mb-1">
+        <i class="fa fa-wallet text-primary me-2"></i>
+        Payroll Karyawan
+      </h4>
+      <p class="text-muted mb-0">
+        Ringkasan dan pengelolaan gaji teknisi per periode
+      </p>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('payroll_settings') }}" class="btn btn-light border btn-sm">
+        <i class="fa fa-gear me-1"></i> Pengaturan Payroll
+      </a>
+      <button type="button"
+              class="btn btn-primary btn-sm"
+              onclick="document.getElementById('generatePayrollCard').scrollIntoView({behavior:'smooth'})">
+        <i class="fa fa-plus me-1"></i> Generate Payroll
+      </button>
+    </div>
+  </div>
+
+  <!-- GENERATE PAYROLL -->
+  <div id="generatePayrollCard" class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h6 class="fw-semibold mb-3">
+        <i class="fa fa-cogs text-success me-1"></i>
+        Generate Payroll Baru
+      </h6>
+
+      <form action="{{ url_for('generate_payroll') }}" method="post" class="row g-2 align-items-end">
+
+        <div class="col-md-5">
+          <label class="form-label small text-muted">Pilih Teknisi</label>
+          <select name="employee_ids[]" class="form-select form-select-sm" multiple>
+            {% for tech in technicians %}
+              <option value="{{ tech.id }}">{{ tech.nama }}{% if tech.team %} ({{ tech.team }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small text-muted">Periode Gaji</label>
+          <input type="month" name="periode" class="form-control form-control-sm" required>
+        </div>
+
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-success btn-sm w-100">
+            <i class="fa fa-calculator me-1"></i> Generate Payroll
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FILTER -->
+  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <span class="fw-semibold small text-muted">Filter Periode:</span>
+    <form method="get" class="d-flex gap-2 align-items-center">
+      <input type="month" name="periode" value="{{ request.args.get('periode', '') }}" class="form-control form-control-sm" style="max-width:180px;">
+      <button type="submit" class="btn btn-outline-primary btn-sm">Terapkan</button>
+      {% if request.args.get('periode') %}
+        <a href="{{ url_for('payroll_index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- TABLE -->
+  {% if payrolls %}
+  {% set total = namespace(pendapatan=0, potongan=0, gaji_bersih=0) %}
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle text-nowrap">
+      <thead class="table-light text-center">
+        <tr>
+          <th>Periode</th>
+          <th>Teknisi</th>
+          <th>Status</th>
+          <th class="text-end">Pendapatan</th>
+          <th class="text-end">Potongan</th>
+          <th class="text-end">Gaji Bersih</th>
+          <th style="min-width:150px">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pay in payrolls %}
+          {% set total.pendapatan = total.pendapatan + (pay.total_pendapatan or 0) %}
+          {% set total.potongan = total.potongan + (pay.total_potongan or 0) %}
+          {% set total.gaji_bersih = total.gaji_bersih + (pay.gaji_bersih or 0) %}
+          <tr>
+            <td class="text-center">{{ pay.periode }}</td>
+            <td>{{ pay.employee.nama if pay.employee else '-' }}</td>
+            <td class="text-center">
+              {% if pay.status == 'Final' %}
+                <span class="badge bg-success">Final</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Draft</span>
+              {% endif %}
+            </td>
+            <td class="text-end">Rp {{ '{:,.0f}'.format(pay.total_pendapatan or 0) }}</td>
+            <td class="text-end text-danger">-Rp {{ '{:,.0f}'.format(pay.total_potongan or 0) }}</td>
+            <td class="text-end fw-bold text-success">Rp {{ '{:,.0f}'.format(pay.gaji_bersih or 0) }}</td>
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-1 flex-wrap">
+                <a href="{{ url_for('payroll_detail', id=pay.id) }}" class="btn btn-sm btn-outline-primary">Lihat</a>
+                {% if pay.status != 'Final' %}
+                  <form action="{{ url_for('payroll_final', id=pay.id) }}" method="post">
+                    <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Finalkan payroll ini?')">Final</button>
+                  </form>
+                {% else %}
+                  <button class="btn btn-sm btn-success" disabled>Final</button>
+                {% endif %}
+                <form action="{{ url_for('payroll_delete', id=pay.id) }}" method="post" onsubmit="return confirm('Hapus payroll ini?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="3" class="text-end">TOTAL</td>
+          <td class="text-end">Rp {{ '{:,.0f}'.format(total.pendapatan) }}</td>
+          <td class="text-end text-danger">-Rp {{ '{:,.0f}'.format(total.potongan) }}</td>
+          <td class="text-end text-success">Rp {{ '{:,.0f}'.format(total.gaji_bersih) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+    <div class="alert alert-info text-center">Belum ada data payroll.</div>
+  {% endif %}
+
+</div>
+```
+
+  </div>
+</div>
+
+{% endblock %}

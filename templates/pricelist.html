@@ -1,0 +1,29 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h3>Daftar Pricelist</h3>
+  <a href="{{ url_for('pricelist_add') }}" class="btn btn-primary mb-3">+ Tambah Item</a>
+  <table class="table table-bordered table-striped">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Kategori</th>
+        <th>Nama Item</th>
+        <th>Harga</th>
+        <th>Keterangan</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in items %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ i.kategori }}</td>
+        <td>{{ i.nama_item }}</td>
+        <td>Rp {{ "{:,.0f}".format(i.harga) }}</td>
+        <td>{{ i.keterangan }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

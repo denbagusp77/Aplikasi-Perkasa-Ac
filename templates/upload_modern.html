@@ -1,0 +1,77 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="card shadow-sm p-4">
+  <h4 class="mb-3"><i class="bi bi-upload"></i> Upload Data via Excel</h4>
+
+  <!-- 🔹 Upload Customers -->
+  <form method="post" action="{{ url_for('upload_customers') }}" enctype="multipart/form-data" class="mb-4">
+    <h5 class="text-primary"><i class="bi bi-people"></i> Upload Customers</h5>
+    <div class="mb-3">
+      <label class="form-label">Pilih File Excel</label>
+      <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+    </div>
+    <button class="btn btn-primary"><i class="bi bi-cloud-arrow-up"></i> Upload Customers</button>
+    <a href="{{ url_for('download_template_customers') }}" class="btn btn-outline-info">
+      <i class="bi bi-file-earmark-excel"></i> Download Template Customers
+    </a>
+  </form>
+
+  <!-- 🔹 Upload Perbaikan Teknisi -->
+  <form method="post" action="{{ url_for('update_technicians') }}" enctype="multipart/form-data" class="mb-4">
+    <h5 class="text-warning"><i class="bi bi-tools"></i> Upload Perbaikan Teknisi</h5>
+    <div class="mb-3">
+      <label class="form-label">Pilih File Excel</label>
+      <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+    </div>
+    <button class="btn btn-warning"><i class="bi bi-upload"></i> Upload Perbaikan Teknisi</button>
+    <a href="{{ url_for('download_template_teknisi') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-download"></i> Download Template Perbaikan
+    </a>
+  </form>
+
+  <!-- 🔹 Upload Services -->
+  <form method="post" action="{{ url_for('upload_services') }}" enctype="multipart/form-data">
+    <h5 class="text-success"><i class="bi bi-gear"></i> Upload Services</h5>
+    <div class="mb-3">
+      <label class="form-label">Pilih File Excel</label>
+      <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+    </div>
+    <button class="btn btn-success"><i class="bi bi-cloud-arrow-up"></i> Upload Services</button>
+    <a href="{{ url_for('download_template_services') }}" class="btn btn-outline-success">
+      <i class="bi bi-download"></i> Download Template Services
+    </a>
+  </form>
+
+  <!-- 🔹 Panduan -->
+  <div class="alert alert-info mt-4">
+    <i class="bi bi-info-circle"></i> <strong>Format Customers:</strong><br>
+    <code>nama</code>, <code>nomor_wa</code>, <code>alamat</code>, <code>team</code>, 
+    <code>merk</code>, <code>pk</code>, <code>jumlah_unit</code>
+    <hr class="my-2">
+    <small>Contoh:</small><br>
+    <code>Agus</code>, <code>628123456789</code>, <code>Jl. Merdeka No. 10</code>, 
+    <code>Internal</code>, <code>LG</code>, <code>1 PK</code>, <code>2</code>
+
+    <hr class="my-3">
+
+    <i class="bi bi-info-circle"></i> <strong>Format Perbaikan Teknisi:</strong><br>
+    <code>nomor_wa</code>, <code>teknisi</code>
+    <hr class="my-2">
+    <small>Contoh:</small><br>
+    <code>628123456789</code>, <code>Ramadani</code>
+
+    <hr class="my-3">
+
+    <i class="bi bi-info-circle"></i> <strong>Format Services:</strong><br>
+    <code>customer_wa</code>, <code>tanggal</code>, <code>tanggal_cuci_berikutnya</code>, 
+    <code>jenis_service</code>, <code>paket_cuci</code>, <code>merk</code>, 
+    <code>pk</code>, <code>jumlah_unit</code>, <code>harga</code>, 
+    <code>teknisi</code>, <code>pembayaran</code>, <code>deskripsi</code>
+    <hr class="my-2">
+    <small>Contoh:</small><br>
+    <code>628123456789</code>, <code>2025-09-10</code>, <code>2025-12-10</code>, 
+    <code>Cuci AC</code>, <code>Paket Hemat 1/2-1PK</code>, <code>LG</code>, <code>1 PK</code>, 
+    <code>2</code>, <code>150000</code>, <code>Rio</code>, <code>Lunas</code>, <code>Cuci rutin</code>
+  </div>
+</div>
+{% endblock %}

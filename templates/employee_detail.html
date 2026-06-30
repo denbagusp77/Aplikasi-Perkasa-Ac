@@ -1,0 +1,477 @@
+{% extends "base_modern.html" %}
+
+{% block content %}
+
+<style>
+.profile-header{
+    background: linear-gradient(135deg,#0d6efd,#4dabf7);
+    color:white;
+    border:none;
+    border-radius:20px;
+}
+
+.kpi-card{
+    border:none;
+    border-radius:18px;
+    box-shadow:0 8px 24px rgba(0,0,0,.08);
+    transition:.3s;
+}
+
+.kpi-card:hover{
+    transform:translateY(-5px);
+}
+
+.card-modern{
+    border:none;
+    border-radius:18px;
+    box-shadow:0 8px 20px rgba(0,0,0,.06);
+}
+
+.avatar-lg{
+    width:120px;
+    height:120px;
+    object-fit:cover;
+    border-radius:50%;
+    border:4px solid rgba(255,255,255,.3);
+}
+
+.nav-pills .nav-link{
+    border-radius:12px;
+    margin-right:8px;
+    font-weight:600;
+}
+
+.nav-pills .nav-link.active{
+    background:#0d6efd;
+}
+
+.table th{
+    width:220px;
+}
+</style>
+
+<div class="container-fluid">
+
+    <!-- TITLE -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold">
+            <i class="bi bi-person-badge"></i>
+            Detail Teknisi
+        </h3>
+
+        <a href="{{ url_for('employees') }}"
+           class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i>
+            Kembali
+        </a>
+    </div>
+
+    <!-- KPI -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <div class="card kpi-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-tools text-primary fs-1"></i>
+                    <h6 class="mt-2">Total Service</h6>
+                    <h2>{{ total_service }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card kpi-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-cash-stack text-success fs-1"></i>
+                    <h6 class="mt-2">Pendapatan</h6>
+                    <h5>
+                        Rp {{ "{:,.0f}".format(total_pendapatan) }}
+                    </h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card kpi-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-wallet2 text-danger fs-1"></i>
+                    <h6 class="mt-2">Kasbon Aktif</h6>
+                    <h5>
+                        Rp {{ "{:,.0f}".format(total_kasbon) }}
+                    </h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card kpi-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-calendar-check text-info fs-1"></i>
+                    <h6 class="mt-2">Hadir Bulan Ini</h6>
+                    <h2>{{ total_hadir }}</h2>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- HEADER PROFIL -->
+    <div class="card profile-header mb-4">
+        <div class="card-body p-4">
+
+            <div class="row align-items-center">
+
+                <div class="col-md-2 text-center">
+
+                    {% if technician.foto %}
+                    <img src="{{ url_for('uploaded_file', filename=technician.foto) }}"
+                         class="avatar-lg">
+                    {% else %}
+                    <div class="avatar-lg bg-white text-primary d-flex align-items-center justify-content-center mx-auto">
+                        <i class="bi bi-person fs-1"></i>
+                    </div>
+                    {% endif %}
+
+                </div>
+
+                <div class="col-md-6">
+
+                    <h2 class="fw-bold">
+                        {{ technician.nama }}
+                    </h2>
+
+                    <span class="badge bg-success">
+                        {{ technician.status }}
+                    </span>
+
+                    <div class="mt-3">
+
+                        <p class="mb-1">
+                            <i class="bi bi-building"></i>
+                            {{ technician.team }}
+                        </p>
+
+                        <p class="mb-1">
+                            <i class="bi bi-person-workspace"></i>
+                            {{ technician.jabatan }}
+                        </p>
+
+                        <p class="mb-1">
+                            <i class="bi bi-phone"></i>
+                            {{ technician.no_hp }}
+                        </p>
+
+                        <p class="mb-0">
+                            <i class="bi bi-calendar"></i>
+                            {{ technician.tanggal_masuk }}
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-4 text-end">
+
+                    <a href="{{ url_for('edit_employee', id=technician.id) }}"
+                       class="btn btn-light">
+                        <i class="bi bi-pencil"></i>
+                        Edit
+                    </a>
+
+                    {% if technician.no_hp %}
+                    <a href="https://wa.me/{{ technician.no_hp }}"
+                       target="_blank"
+                       class="btn btn-success">
+                        <i class="bi bi-whatsapp"></i>
+                        WhatsApp
+                    </a>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- TAB MENU -->
+    <ul class="nav nav-pills mb-4" id="employeeTabs" role="tablist">
+
+        <li class="nav-item">
+            <button class="nav-link active"
+                    data-bs-toggle="pill"
+                    data-bs-target="#profil"
+                    type="button">
+                Profil
+            </button>
+        </li>
+
+        <li class="nav-item">
+            <button class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#service"
+                    type="button">
+                Service
+            </button>
+        </li>
+
+        <li class="nav-item">
+            <button class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#absensi"
+                    type="button">
+                Absensi
+            </button>
+        </li>
+
+        <li class="nav-item">
+            <button class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#kasbon"
+                    type="button">
+                Kasbon
+            </button>
+        </li>
+
+        <li class="nav-item">
+            <button class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#motor"
+                    type="button">
+                Service Motor
+            </button>
+        </li>
+
+        <li class="nav-item">
+            <button class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#payroll"
+                    type="button">
+                Payroll
+            </button>
+        </li>
+
+    </ul>
+
+    <!-- TAB CONTENT -->
+    <div class="tab-content">
+
+        <!-- PROFIL -->
+        <div class="tab-pane fade show active" id="profil">
+
+            <div class="card card-modern">
+                <div class="card-body">
+
+                    <table class="table table-striped">
+
+                        <tr>
+                            <th>Nama</th>
+                            <td>{{ technician.nama }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Team</th>
+                            <td>{{ technician.team }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Jabatan</th>
+                            <td>{{ technician.jabatan }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>No HP</th>
+                            <td>{{ technician.no_hp }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Status</th>
+                            <td>{{ technician.status }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Tanggal Masuk</th>
+                            <td>{{ technician.tanggal_masuk }}</td>
+                        </tr>
+
+                    </table>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- SERVICE -->
+        <div class="tab-pane fade" id="service">
+
+            <div class="card card-modern">
+                <div class="card-body">
+
+                    <table class="table table-hover">
+
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Jenis Service</th>
+                                <th>Nilai</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                        {% for s in services %}
+                            <tr>
+                                <td>{{ s.tanggal }}</td>
+                                <td>{{ s.jenis_service }}</td>
+                                <td>
+                                    Rp {{ "{:,.0f}".format((s.harga_satuan or 0) * (s.jumlah or 1)) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+
+                    </table>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ABSENSI -->
+        <div class="tab-pane fade" id="absensi">
+
+            <div class="card card-modern">
+                <div class="card-body">
+
+                    <table class="table table-hover">
+
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                        {% for a in attendances %}
+                            <tr>
+                                <td>{{ a.tanggal }}</td>
+                                <td>{{ a.status }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+
+                    </table>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- KASBON -->
+        <div class="tab-pane fade" id="kasbon">
+
+            <div class="card card-modern">
+                <div class="card-body">
+
+                    <table class="table table-hover">
+
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Jumlah</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                        {% for k in kasbons %}
+                            <tr>
+                                <td>{{ k.tanggal }}</td>
+                                <td>Rp {{ "{:,.0f}".format(k.jumlah) }}</td>
+                                <td>{{ k.status }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+
+                    </table>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- SERVICE MOTOR -->
+        <div class="tab-pane fade" id="motor">
+
+            <div class="card card-modern">
+                <div class="card-body">
+
+                    <table class="table table-hover">
+
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Biaya</th>
+                                <th>Porsi Teknisi</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                        {% for m in service_motors %}
+                            <tr>
+                                <td>{{ m.tanggal }}</td>
+                                <td>Rp {{ "{:,.0f}".format(m.biaya) }}</td>
+                                <td>Rp {{ "{:,.0f}".format(m.porsi_teknisi) }}</td>
+                                <td>{{ m.status }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+
+                    </table>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- PAYROLL -->
+        <div class="tab-pane fade" id="payroll">
+
+            <div class="card card-modern">
+                <div class="card-body">
+
+                    <table class="table table-hover">
+
+                        <thead>
+                            <tr>
+                                <th>Periode</th>
+                                <th>Pendapatan</th>
+                                <th>Potongan</th>
+                                <th>Gaji Bersih</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                        {% for p in payrolls %}
+                            <tr>
+                                <td>{{ p.periode }}</td>
+                                <td>Rp {{ "{:,.0f}".format(p.total_pendapatan) }}</td>
+                                <td>Rp {{ "{:,.0f}".format(p.total_potongan) }}</td>
+                                <td>Rp {{ "{:,.0f}".format(p.gaji_bersih) }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+
+                    </table>
+
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

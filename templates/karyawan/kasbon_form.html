@@ -1,0 +1,35 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h4>Tambah Kasbon</h4>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="technician_id" class="form-label">Teknisi</label>
+            <select name="technician_id" id="technician_id" class="form-select" required>
+                <option value="">-- Pilih Teknisi --</option>
+                {% for t in technicians %}
+                    <option value="{{ t.id }}">{{ t.nama }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="tanggal" class="form-label">Tanggal Kasbon</label>
+            <input type="date" name="tanggal" id="tanggal" class="form-control" value="{{ date.today().isoformat() }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="jumlah" class="form-label">Jumlah Kasbon</label>
+            <input type="number" step="0.01" name="jumlah" id="jumlah" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="keterangan" class="form-label">Keterangan</label>
+            <textarea name="keterangan" id="keterangan" class="form-control"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Simpan</button>
+        <a href="{{ url_for('kasbon_list') }}" class="btn btn-secondary">Batal</a>
+    </form>
+</div>
+{% endblock %}

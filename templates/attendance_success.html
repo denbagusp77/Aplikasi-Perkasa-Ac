@@ -1,0 +1,11 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="text-center mt-5">
+  <h3>✅ Absen Berhasil</h3>
+  <p>Terima kasih, {{ technician.nama }}!</p>
+  <p>{{ message }}</p>
+  <a href="{{ url_for('employees') }}" class="btn btn-primary mt-3">
+    <i class="bi bi-arrow-left"></i> Kembali ke Data Karyawan
+  </a>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h3>
+    Laporan Laba Rugi -
+    {% if start_date and end_date %}
+      {{ format_date(start_date) }} s/d {{ format_date(end_date) }}
+    {% elif bulan and tahun %}
+      {{ bulan_names[bulan-1] }} {{ tahun }}
+    {% else %}
+      Semua Periode
+    {% endif %}
+  </h3>
+
+  <!-- 🔹 Tombol Navigasi -->
+  <div class="mb-3">
+    <a href="{{ url_for('laba_rugi', tahun=current_year, bulan=current_month) }}" class="btn btn-secondary">Bulan Ini</a>
+    <a href="{{ url_for('laba_rugi') }}" class="btn btn-info">Lihat Semua</a>
+    <a href="{{ url_for('laba_rugi_excel', tahun=tahun, bulan=bulan) }}" class="btn btn-success">Export Excel</a>
+    <a href="{{ url_for('laba_rugi_pdf', tahun=tahun, bulan=bulan) }}" class="btn btn-danger">Export PDF</a>
+  </div>
+
+  <!-- 🔹 Filter Bulan & Tahun -->
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+      <select name="bulan" class="form-select">
+        {% for nama in bulan_names %}
+          <option value="{{ loop.index }}" {% if loop.index == bulan %}selected{% endif %}>
+            {{ nama }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <input type="number" name="tahun" value="{{ tahun }}" class="form-control" min="2000" max="2100">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary">Tampilkan</button>
+    </div>
+  </form>
+
+  <!-- 🔹 Ringkasan -->
+  <table class="table table-bordered">
+    <tr><td>Pendapatan</td><td>Rp {{ "{:,.0f}".format(pendapatan) }}</td></tr>
+    <tr><td>Beban</td><td>Rp {{ "{:,.0f}".format(beban) }}</td></tr>
+    <tr class="table-success">
+      <td><b>Laba Bersih</b></td>
+      <td><b>Rp {{ "{:,.0f}".format(laba_bersih) }}</b></td>
+    </tr>
+  </table>
+
+  <!-- 🔹 Daftar transaksi -->
+  <h5>Detail Transaksi</h5>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Tanggal</th>
+        <th>Kategori</th>
+        <th>Jenis</th>
+        <th>Deskripsi</th>
+        <th>Jumlah</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in trans %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ t.tanggal.strftime('%d-%m-%Y') }}</td>
+        <td>{{ t.kategori }}</td>
+        <td>{{ t.jenis }}</td>
+        <td>{{ t.deskripsi }}</td>
+        <td>Rp {{ "{:,.0f}".format(t.jumlah) }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" class="text-center">Belum ada transaksi</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

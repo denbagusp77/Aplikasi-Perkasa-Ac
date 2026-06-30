@@ -1,0 +1,125 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="card shadow p-4">
+  <h4 class="mb-3">📅 Reminder Otomatis - Service Cuci</h4>
+  <p class="text-muted">
+    Menampilkan daftar customer yang perlu diingatkan dari H-14 hingga H-1 sebelum jadwal cuci AC berikutnya.
+  </p>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Customer</th>
+          <th>No WA</th>
+          <th>Alamat</th>
+          <th>Team</th>
+          <th>Unit</th>
+          <th>Tgl Cuci Berikutnya</th>
+          <th>Status Reminder</th>
+          <th>Keterangan</th>
+          <th class="text-center">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reminders %}
+        <tr>
+          <td><strong>{{ r.nama }}</strong></td>
+          <td>
+            <a href="https://web.whatsapp.com/send?phone={{ r.wa }}" target="_blank" class="text-success">
+              <i class="bi bi-whatsapp"></i> {{ r.wa }}
+            </a>
+          </td>
+          <td>{{ r.alamat }}</td>
+          <td>
+            <span class="badge {% if r.team == 'Internal' %}bg-primary{% else %}bg-secondary{% endif %}">
+              {{ r.team }}
+            </span>
+          </td>
+          <td>{{ r.unit }}</td>
+          <td>
+            <span class="badge bg-info text-dark">{{ r.tanggal.strftime('%d/%m/%Y') }}</span>
+          </td>
+          <td>
+            {% set h_value = r.tipe.split('-')[1]|int %}
+            {% if h_value == 1 %}
+              <span class="badge bg-danger">H-1</span>
+            {% elif h_value == 7 %}
+              <span class="badge bg-warning text-dark">H-7</span>
+            {% elif h_value <= 3 %}
+              <span class="badge bg-danger-subtle text-dark">{{ r.tipe }}</span>
+            {% elif h_value <= 10 %}
+              <span class="badge bg-info text-dark">{{ r.tipe }}</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ r.tipe }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.keterangan == 'Sudah di-Reminder' %}
+              <span class="badge bg-success">
+                <i class="bi bi-check-circle-fill"></i> {{ r.keterangan }}
+              </span>
+            {% elif r.keterangan == 'Belum di-Reminder' %}
+              <span class="badge bg-danger">
+                <i class="bi bi-x-circle-fill"></i> {{ r.keterangan }}
+              </span>
+            {% else %}
+              <span class="badge bg-secondary">{{ r.keterangan }}</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <a href="{{ url_for('service_edit', id=r.id) }}" 
+              class="btn btn-sm btn-outline-warning me-1">
+              <i class="bi bi-pencil-square"></i> Edit
+            </a>
+
+            {% if r.keterangan == 'Sudah di-Reminder' %}
+              <button class="btn btn-sm btn-success" onclick="kirimReminder({{ r.id }})">
+                <i class="bi bi-check-lg"></i> Sudah Dikirim
+              </button>
+            {% else %}
+              <button class="btn btn-sm btn-danger" onclick="kirimReminder({{ r.id }})">
+                <i class="bi bi-send"></i> Kirim Reminder
+              </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted">
+            Tidak ada reminder untuk periode H-14 hingga H-1 🙌
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ✅ Script JS: selalu pakai tab WhatsApp yang sama -->
+<script>
+  function kirimReminder(id) {
+    fetch('/reminder/send/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        alert('Gagal: ' + (data.message || 'Tidak diketahui'));
+        return;
+      }
+
+      // 🟢 Buka WhatsApp di tab bernama "waTab"
+      window.open(data.wa_url, 'waTab');
+
+      // 🟢 Refresh status reminder setelah delay
+      setTimeout(() => location.reload(), 1500);
+    })
+    .catch(err => {
+      console.error('Error:', err);
+      alert('Terjadi kesalahan saat mengirim reminder.');
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">👤 Detail Kasbon — {{ tech.nama }}</h4>
+    <a href="{{ url_for('kasbon_list') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      {% if kasbons %}
+      <table class="table table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="text-center"><input type="checkbox" id="selectAll"></th>
+            <th>Tanggal</th>
+            <th>Jumlah</th>
+            <th>Keterangan</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in kasbons %}
+          <tr>
+            <td class="text-center">
+              <input type="checkbox" class="kasbon-checkbox" value="{{ k.jumlah }}">
+            </td>
+            <td>{{ k.tanggal.strftime('%d-%m-%Y') }}</td>
+            <td>Rp {{ '{:,.0f}'.format(k.jumlah) }}</td>
+            <td>{{ k.keterangan or '-' }}</td>
+            <td>
+              {% if k.status == 'Lunas' %}
+                <span class="badge bg-success">Lunas</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Belum Lunas</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="d-flex justify-content-end mt-3">
+        <h5>Total Terpilih: <span id="totalKasbon" class="text-primary">Rp 0</span></h5>
+      </div>
+      {% else %}
+      <p class="text-muted">Belum ada data kasbon untuk teknisi ini.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  const checkboxes = document.querySelectorAll('.kasbon-checkbox');
+  const selectAll = document.getElementById('selectAll');
+  const totalKasbon = document.getElementById('totalKasbon');
+
+  function formatRupiah(angka) {
+    return "Rp " + angka.toLocaleString("id-ID");
+  }
+
+  function updateTotal() {
+    let total = 0;
+    checkboxes.forEach(cb => {
+      if (cb.checked) total += parseFloat(cb.value);
+    });
+    totalKasbon.textContent = formatRupiah(total);
+  }
+
+  checkboxes.forEach(cb => cb.addEventListener('change', updateTotal));
+
+  selectAll.addEventListener('change', () => {
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateTotal();
+  });
+</script>
+{% endblock %}

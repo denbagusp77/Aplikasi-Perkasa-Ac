@@ -1,0 +1,44 @@
+{% extends "base_modern.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h4>✏️ Edit Porsi Service Motor</h4>
+
+    <div class="card mt-3">
+        <div class="card-body">
+
+            <p><strong>Tanggal:</strong> {{ service.tanggal.strftime('%d-%m-%Y') }}</p>
+            <p><strong>Total Biaya:</strong> Rp {{ "{:,.0f}".format(service.total_biaya) }}</p>
+
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">Persentase Perusahaan (%)</label>
+                    <input
+                        type="number"
+                        name="persen_perusahaan"
+                        class="form-control"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="{{ service.persen_perusahaan or 30 }}"
+                        required
+                    >
+                    <small class="text-muted">
+                        Teknisi otomatis menerima {{ 100 - (service.persen_perusahaan or 30) }}%
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    💾 Simpan Perubahan
+                </button>
+
+                <a href="{{ url_for('service_motor_list') }}"
+                   class="btn btn-secondary">
+                    ⬅ Kembali
+                </a>
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

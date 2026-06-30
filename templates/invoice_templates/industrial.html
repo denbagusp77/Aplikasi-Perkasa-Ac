@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<style>
+@page {
+  size: A4 landscape;
+  margin: 15mm;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+}
+
+.header-table {
+  width:100%;
+  border-collapse: collapse;
+}
+
+.header-table td {
+  border:none;
+  vertical-align: top;
+}
+
+.title {
+  font-size:26pt;
+  font-weight:bold;
+  text-align:right;
+}
+
+.company {
+  font-size:11pt;
+}
+
+table {
+  width:100%;
+  border-collapse: collapse;
+  margin-top:15px;
+}
+
+th, td {
+  border:1px solid #000;
+  padding:6px;
+}
+
+th {
+  font-weight:bold;
+  text-align:center;
+}
+
+.text-right { text-align:right; }
+.text-center { text-align:center; }
+
+.summary-box {
+  width:35%;
+  margin-top:15px;
+  float:right;
+}
+
+.summary-box td {
+  border:1px solid #000;
+  padding:6px;
+}
+
+.bold { font-weight:bold; }
+
+.signature {
+  clear:both;
+  margin-top:60px;
+  text-align:right;
+}
+
+table { page-break-inside: avoid; }
+tr { page-break-inside: avoid; }
+
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<table class="header-table">
+<tr>
+
+<td width="60%" class="company">
+<b>Perkasa AC</b><br>
+JL. Sukabangun Indah 3 No 07 Palembang
+<br><br>
+
+<b>KEPADA :</b><br>
+{{ invoice.customer.nama }}<br>
+{{ invoice.customer.alamat }}
+</td>
+
+<td width="40%" class="text-right">
+<div class="title">INVOICE</div>
+<br>
+<b>Number :</b> INV-{{ invoice.tanggal.strftime("%Y") }}-{{ invoice.id }}<br>
+<b>Inv Date :</b> {{ invoice.tanggal.strftime("%d/%m/%Y") }}<br>
+<b>PO Number :</b> {{ invoice.spo or "-" }}
+</td>
+
+</tr>
+</table>
+
+<!-- TABLE -->
+<table>
+<thead>
+<tr>
+<th width="5%">NO</th>
+<th width="44%">PRODUCT DESCRIPTION</th>
+<th width="8%">QTY</th>
+<th width="8%">UOM</th>
+<th width="15%">UNIT PRICE</th>
+<th width="20%">AMOUNT</th>
+</tr>
+</thead>
+
+<tbody>
+{% set no = 1 %}
+{% for ruangan, items in grouped_items.items() %}
+
+<tr>
+    <td class="text-center">{{ no }}</td>
+
+    <td>
+        <b>JASA CUCI AC {{ invoice.customer.nama }} Ruang {{ ruangan }}</b><br>
+
+        {% for key, row in items.items() %}
+        * Jasa Cuci AC {{ row.merk }} {{ row.pk }} PK : {{ row.qty }} unit<br>
+        {% endfor %}
+    </td>
+
+    <td class="text-center">
+        {{ items.values() | map(attribute='qty') | sum }}
+    </td>
+
+    <td class="text-center">pc</td>
+
+    <td class="text-right">
+        {{ items.values() | list | first | attr('harga') | rupiah }}
+    </td>
+
+    <td class="text-right">
+        {{ items.values() | map(attribute='subtotal') | sum | rupiah }}
+    </td>
+
+</tr>
+
+{% set no = no + 1 %}
+{% endfor %}
+</tbody>
+</table>
+
+<!-- SUMMARY -->
+<table class="summary-box">
+<tr>
+<td class="bold">TOTAL</td>
+<td class="text-right bold">
+{{ "{:,.0f}".format(subtotal).replace(",", ".") }}
+</td>
+</tr>
+
+{% if ppn_amt > 0 %}
+<tr>
+<td>PPN</td>
+<td class="text-right">
+{{ "{:,.0f}".format(ppn_amt).replace(",", ".") }}
+</td>
+</tr>
+{% endif %}
+
+<tr>
+<td class="bold">GRAND TOTAL</td>
+<td class="text-right bold">
+{{ "{:,.0f}".format(total).replace(",", ".") }}
+</td>
+</tr>
+</table>
+
+<!-- TOTAL + PEMBAYARAN -->
+<table class="section no-break">
+<tr>
+<td width="60%" style="border:none;">
+<b>Pembayaran:</b><br>
+{% if bank %}
+{{ bank.bank_name }}<br>
+{{ bank.account_name }}<br>
+{{ bank.account_number }}
+{% else %}
+-
+{% endif %}
+</td>
+<br>
+<br>
+<br>
+<br>
+
+<!-- SIGNATURE -->
+<div class="signature">
+Hormat Kami,<br><br><br>
+<br>
+<br>
+<br>
+<br>
+<b>CV ANDI JAYA</b>
+</div>
+
+</body>
+</html>

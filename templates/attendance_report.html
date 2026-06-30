@@ -1,0 +1,258 @@
+{% extends 'base_modern.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3><i class="bi bi-calendar-check"></i> Laporan Absensi</h3>
+  <div>
+    <a href="{{ url_for('employees') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <button class="btn btn-primary ms-2" data-bs-toggle="modal" data-bs-target="#modalAttendanceAdd">
+      <i class="bi bi-plus-lg"></i> Tambah Absen Manual
+    </button>
+  </div>
+</div>
+
+<div class="card shadow-sm rounded-3">
+  <div class="card-body">
+    <!-- Filter Bulan & Tahun -->
+    <form method="get" class="row g-3 mb-4">
+      <div class="col-md-3">
+        <label class="form-label">Bulan</label>
+        <select name="month" class="form-select">
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Tahun</label>
+        <input type="number" name="year" value="{{ year }}" class="form-control" min="2020" max="2100">
+      </div>
+      <div class="col-md-3 align-self-end">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search"></i> Tampilkan
+        </button>
+      </div>
+    </form>
+
+    <!-- Tabel Data Absensi -->
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Nama Karyawan</th>
+            <th>Tanggal</th>
+            <th>Jam Masuk</th>
+            <th>Jam Pulang</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ r.technician.nama }}</td>
+            <td>{{ r.tanggal.strftime('%d-%m-%Y') }}</td>
+            <td>{{ r.jam_masuk.strftime('%H:%M:%S') if r.jam_masuk else '-' }}</td>
+            <td>{{ r.jam_pulang.strftime('%H:%M:%S') if r.jam_pulang else '-' }}</td>
+            <td>
+              {% if r.status == 'Hadir' %}
+                <span class="badge bg-success">Hadir</span>
+              {% elif r.status == 'Izin' %}
+                <span class="badge bg-warning text-dark">Izin</span>
+              {% elif r.status == 'Sakit' %}
+                <span class="badge bg-info text-dark">Sakit</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ r.status or '-' }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <!-- Tombol Edit -->
+              <button type="button"
+                      class="btn btn-sm btn-outline-primary btn-edit-attendance"
+                      data-id="{{ r.id }}"
+                      data-technician="{{ r.technician.nama }}"
+                      data-tanggal="{{ r.tanggal.strftime('%Y-%m-%d') }}"
+                      data-jam-masuk="{{ r.jam_masuk.strftime('%H:%M:%S') if r.jam_masuk else '' }}"
+                      data-jam-pulang="{{ r.jam_pulang.strftime('%H:%M:%S') if r.jam_pulang else '' }}"
+                      data-status="{{ r.status or '' }}"
+                      data-keterangan="{{ r.keterangan or '' }}">
+                <i class="bi bi-pencil"></i>
+              </button>
+
+              <!-- Tombol Hapus -->
+              <form action="{{ url_for('delete_attendance', id=r.id) }}"
+                    method="POST"
+                    style="display:inline;"
+                    onsubmit="return confirm('Yakin ingin menghapus data absensi ini?');">
+                <button type="submit" class="btn btn-sm btn-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">Belum ada data absensi.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Tambah Absensi -->
+<div class="modal fade" id="modalAttendanceAdd" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form action="{{ url_for('attendance_add') }}" method="POST" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Tambah Absen Manual</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Nama Karyawan</label>
+          <select name="technician_id" class="form-select" required>
+            <option value="">-- Pilih Karyawan --</option>
+            {% for t in technicians %}
+            <option value="{{ t.id }}">{{ t.nama }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Tanggal</label>
+          <input type="date" name="tanggal" class="form-control" required>
+        </div>
+        <div class="row mb-2">
+          <div class="col">
+            <label class="form-label">Jam Masuk</label>
+            <input type="time" name="jam_masuk" class="form-control">
+          </div>
+          <div class="col">
+            <label class="form-label">Jam Pulang</label>
+            <input type="time" name="jam_pulang" class="form-control">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="Hadir">Hadir</option>
+            <option value="Izin">Izin</option>
+            <option value="Sakit">Sakit</option>
+            <option value="Alpa">Alpa</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Keterangan</label>
+          <input type="text" name="keterangan" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Edit Absensi -->
+<div class="modal fade" id="editAttendanceModal" tabindex="-1" aria-labelledby="editAttendanceLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" id="editAttendanceForm">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="editAttendanceLabel">Edit Absensi</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="id" id="edit-id">
+          <div class="mb-3">
+            <label class="form-label">Teknisi</label>
+            <input type="text" class="form-control" id="edit-technician" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Tanggal</label>
+            <input type="date" class="form-control" name="tanggal" id="edit-tanggal">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Jam Masuk</label>
+            <input type="time" class="form-control" name="jam_masuk" id="edit-jam-masuk">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Jam Pulang</label>
+            <input type="time" class="form-control" name="jam_pulang" id="edit-jam-pulang">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select class="form-select" name="status" id="edit-status">
+              <option value="Hadir">Hadir</option>
+              <option value="Izin">Izin</option>
+              <option value="Sakit">Sakit</option>
+              <option value="Alpa">Alpa</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Keterangan</label>
+            <textarea class="form-control" name="keterangan" id="edit-keterangan" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const modalEl = document.getElementById('editAttendanceModal');
+  const modal = new bootstrap.Modal(modalEl);
+  const form = document.getElementById('editAttendanceForm');
+
+  document.querySelectorAll('.btn-edit-attendance').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('edit-id').value = btn.dataset.id;
+      document.getElementById('edit-technician').value = btn.dataset.technician;
+      document.getElementById('edit-tanggal').value = btn.dataset.tanggal;
+      document.getElementById('edit-jam-masuk').value = btn.dataset.jamMasuk;
+      document.getElementById('edit-jam-pulang').value = btn.dataset.jamPulang;
+      document.getElementById('edit-status').value = btn.dataset.status || 'Hadir';
+      document.getElementById('edit-keterangan').value = btn.dataset.keterangan;
+      modal.show();
+    });
+  });
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-id').value;
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch(`/attendance/edit/${id}`, {
+        method: 'POST',
+        body: formData
+      });
+      if (response.redirected) {
+        window.location.href = response.url;
+      } else if (response.ok) {
+        location.reload();
+      } else {
+        alert('Gagal memperbarui absensi.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan koneksi ke server.');
+    }
+  });
+});
+</script>
+{% endblock %}

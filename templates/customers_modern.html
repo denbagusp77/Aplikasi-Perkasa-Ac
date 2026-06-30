@@ -1,0 +1,84 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Customers</h3>
+  <div>
+    <a class="btn btn-outline-secondary me-2" href="{{ url_for('upload_customers') }}">
+      <i class="bi bi-upload"></i> Upload
+    </a>
+    <a class="btn btn-primary" href="{{ url_for('customers_new') }}">
+      <i class="bi bi-plus"></i> Tambah
+    </a>
+  </div>
+</div>
+
+<!-- 🔍 Search & Filter -->
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-3">
+    <input type="text" class="form-control" placeholder="Cari nama atau No WA..." 
+           name="q" value="{{ q }}">
+  </div>
+  <div class="col-md-2">
+    <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
+  </div>
+  <div class="col-md-2">
+    <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="team">
+      <option value="">-- Semua Team --</option>
+      <option value="Internal" {% if team == 'Internal' %}selected{% endif %}>Internal</option>
+      <option value="Eksternal" {% if team == 'Eksternal' %}selected{% endif %}>Eksternal</option>
+    </select>
+  </div>
+  <div class="col-md-2 d-grid">
+    <button class="btn btn-outline-secondary"><i class="bi bi-funnel"></i> Filter</button>
+  </div>
+</form>
+
+<!-- 📋 Table -->
+<table class="table table-hover bg-white rounded shadow-sm">
+  <thead class="table-light">
+    <tr>
+      <th>Last Service</th>
+      <th>Nama</th>
+      <th>No WA</th>
+      <th>Alamat</th>
+      <th>Team</th>
+      <th>Total Unit</th>
+      <th>Total Services</th>
+      <th>Aksi</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c, total_units, total_services, last_service_date in customers %}
+
+    <tr>
+      <td>{{ last_service_date.strftime("%d %b %Y") if last_service_date else '-' }}</td>
+      <td>{{ c.nama }}</td>
+      <td>{{ c.nomor_wa }}</td>
+      <td>{{ c.alamat }}</td>
+      <td>{{ c.team }}</td>
+      <td>{{ total_units }}</td>
+      <td>{{ total_services }}</td>
+      <td>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('units', cid=c.id) }}">
+          <i class="bi bi-box-seam"></i>
+        </a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers_edit', id=c.id) }}">
+          <i class="bi bi-pencil"></i>
+        </a>
+        <form method="post" action="{{ url_for('customers_delete', id=c.id) }}" 
+              style="display:inline" onsubmit="return confirm('Hapus customer?')">
+          <button class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="7" class="text-center text-muted">Tidak ada data</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

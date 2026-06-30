@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+
+<style>
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 9.5pt;
+  margin: 0;
+  color: #222;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 5px;
+  font-size: 9.3pt;
+}
+
+th {
+  background: #eef3ff;
+}
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
+.header td {
+  border: none;
+  padding: 2px 0;
+}
+
+.company {
+  font-size: 11pt;
+  font-weight: bold;
+}
+
+.invoice-title {
+  font-size: 16pt;
+  font-weight: bold;
+}
+
+.section {
+  margin-top: 6px;
+}
+
+.no-break {
+  page-break-inside: avoid;
+}
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<table class="header">
+<tr>
+  <td width="55%">
+    <div class="company">Perkasa Ac</div>
+    JL. Sukabangun Indah 3 No 07 Palembang
+  </td>
+  <td width="45%" class="text-right">
+    <div class="invoice-title">INVOICE</div>
+    INV-{{ invoice.tanggal.strftime("%Y") }}-{{ invoice.id }}<br>
+    {{ invoice.tanggal.strftime("%d/%m/%Y") }}<br>
+    <b>SPO:</b> {{ spo if spo else "-" }}
+  </td>
+</tr>
+</table>
+
+<!-- CUSTOMER -->
+<div class="section">
+<b>Kepada Yth:</b><br>
+{{ invoice.customer.nama }} | {{ invoice.customer.nomor_wa }}<br>
+{{ invoice.customer.alamat or '-' }}
+</div>
+
+<!-- TABEL ITEM -->
+<table class="section">
+<thead>
+<tr>
+  <th width="15%">Ruangan</th>
+  <th>Deskripsi</th>
+  <th width="6%" class="text-center">Qty</th>
+  <th width="12%" class="text-right">Harga</th>
+  <th width="14%" class="text-right">Subtotal</th>
+</tr>
+</thead>
+<tbody>
+
+{% for ruangan, items in grouped_items.items() %}
+
+<tr>
+  <td colspan="5" style="background:#f5f7ff; font-weight:bold;">
+    {{ ruangan }}
+  </td>
+</tr>
+
+    {% for item in items %}
+    <tr>
+      <td></td>
+
+      <td>
+        - {{ item.deskripsi }}
+      </td>
+
+      <td class="text-center">
+        {{ item.qty }}
+      </td>
+
+      <td class="text-right">
+        Rp {{ "{:,.0f}".format(item.harga or 0).replace(",", ".") }}
+      </td>
+
+      <td class="text-right">
+        Rp {{ "{:,.0f}".format(item.subtotal or 0).replace(",", ".") }}
+      </td>
+    </tr>
+    {% endfor %}
+
+{% endfor %}
+
+</tbody>
+
+
+
+</table>
+
+<!-- TOTAL + PEMBAYARAN -->
+<table class="section no-break">
+<tr>
+<td width="60%" style="border:none;">
+<b>Pembayaran:</b><br>
+{% if bank %}
+{{ bank.bank_name }}<br>
+{{ bank.account_name }}<br>
+{{ bank.account_number }}
+{% else %}
+-
+{% endif %}
+</td>
+
+<td width="40%" style="border:none;">
+<table>
+<tr>
+  <td class="text-right"><b>Total</b></td>
+  <td class="text-right"><b>Rp {{ "{:,.0f}".format(total) }}</b></td>
+</tr>
+
+{% if dp > 0 %}
+<tr>
+  <td class="text-right">DP</td>
+  <td class="text-right">Rp {{ "{:,.0f}".format(dp) }}</td>
+</tr>
+<tr>
+  <td class="text-right"><b>Sisa</b></td>
+  <td class="text-right"><b>Rp {{ "{:,.0f}".format(sisa) }}</b></td>
+</tr>
+{% endif %}
+</table>
+</td>
+</tr>
+</table>
+
+<!-- TANDA TANGAN -->
+<div class="section no-break" style="text-align:right;">
+Hormat Kami,<br><br><br>
+<b>Perkasa Ac</b>
+</div>
+
+</body>
+</html>

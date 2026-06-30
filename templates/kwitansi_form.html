@@ -1,0 +1,43 @@
+<form method="POST">
+
+<table>
+  <tr>
+    <td>No Kwitansi</td>
+    <td>: <input type="text" name="nomor_kwitansi" required></td>
+  </tr>
+
+  <tr>
+    <td>Sudah terima dari</td>
+    <td>: {{ invoice.customer.nama }}</td>
+  </tr>
+
+  <tr>
+    <td>Banyaknya uang</td>
+    <td>: Rp {{ "{:,.0f}".format(total).replace(",", ".") }}</td>
+  </tr>
+
+  <tr>
+    <td>Terbilang</td>
+    <td>: {{ total_terbilang|upper }} RUPIAH</td>
+  </tr>
+
+  <tr>
+    <td>Untuk Pembayaran</td>
+    <td>: PO JASA NO. {{ invoice.spo }}</td>
+  </tr>
+  <tr>
+  <td>Tanggal</td>
+  <td>: 
+    <input type="date" name="tanggal" 
+           value="{{ today if today else '' }}" 
+           required>
+  </td>
+</tr>
+</table>
+
+<br>
+<button type="submit" class="btn btn-success w-100">
+  Simpan & Cetak PDF
+</button>
+
+</form>

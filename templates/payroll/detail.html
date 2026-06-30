@@ -1,0 +1,314 @@
+{% extends "base_modern.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+
+        <div class="d-flex justify-content-between align-items-center">
+
+            <div>
+                <h4 class="fw-bold mb-1">
+                    Payroll {{ employee.nama }}
+                </h4>
+
+                <div class="text-muted">
+                    Periode {{ payroll.periode }}
+                </div>
+
+                <div class="mt-2">
+
+                    {% if payroll.status == 'Final' %}
+                        <span class="badge bg-success">
+                            FINAL
+                        </span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">
+                            DRAFT
+                        </span>
+                    {% endif %}
+
+                    <span class="badge bg-light text-dark">
+                        Dibuat:
+                        {{ payroll.tanggal_dibuat.strftime('%d %b %Y') if payroll.tanggal_dibuat else '-' }}
+                    </span>
+
+                </div>
+
+            </div>
+
+            <div class="d-flex gap-2">
+
+                {% if payroll.status == 'Final' %}
+
+                    <a href="{{ url_for('payroll_print', id=payroll.id) }}"
+                       class="btn btn-outline-primary">
+                        <i class="fas fa-print"></i>
+                        Cetak Slip
+                    </a>
+
+                    <form method="POST"
+                          action="{{ url_for('payroll_undo_final', id=payroll.id) }}">
+
+                        <button class="btn btn-warning">
+                            <i class="fas fa-undo"></i>
+                            Undo
+                        </button>
+
+                    </form>
+
+                {% else %}
+
+                    <form method="POST"
+                          action="{{ url_for('payroll_final', id=payroll.id) }}">
+
+                        <button class="btn btn-success">
+                            <i class="fas fa-check-circle"></i>
+                            Finalisasi
+                        </button>
+
+                    </form>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+<div class="row g-3 mb-4">
+
+    <div class="col-md-3">
+        <div class="card border-success shadow-sm">
+            <div class="card-body text-center">
+                <h2 class="fw-bold text-success">
+                    {{ total_hadir }}
+                </h2>
+                <small class="text-muted">
+                    Hadir
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-warning shadow-sm">
+            <div class="card-body text-center">
+                <h2 class="fw-bold text-warning">
+                    {{ total_izin }}
+                </h2>
+                <small class="text-muted">
+                    Izin / Sakit
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-danger shadow-sm">
+            <div class="card-body text-center">
+                <h2 class="fw-bold text-danger">
+                    {{ total_tidak_hadir }}
+                </h2>
+                <small class="text-muted">
+                    Alpa
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-primary shadow-sm">
+            <div class="card-body text-center">
+                <h2 class="fw-bold text-primary">
+                    {{ hari_kerja_aktif }}
+                </h2>
+                <small class="text-muted">
+                    Hari Kerja
+                </small>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="row">
+
+
+<div class="col-md-6">
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            Pendapatan
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-sm">
+
+                {% for item in items if item.kategori == 'Pendapatan' %}
+                <tr>
+                    <td>{{ item.deskripsi }}</td>
+                    <td class="text-end">
+                        {{ item.jumlah | rupiah }}
+                    </td>
+                </tr>
+                {% endfor %}
+
+                <tr class="fw-bold border-top">
+                    <td>Total Pendapatan</td>
+                    <td class="text-end">
+                        {{ payroll.total_pendapatan | rupiah }}
+                    </td>
+                </tr>
+
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<div class="col-md-6">
+    <div class="card shadow-sm">
+
+        <div class="card-header bg-danger text-white">
+            Potongan
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-sm">
+
+                {% for item in items if item.kategori == 'Potongan' %}
+                <tr>
+                    <td>{{ item.deskripsi }}</td>
+                    <td class="text-end text-danger">
+                        {{ item.jumlah | rupiah }}
+                    </td>
+                </tr>
+                {% endfor %}
+
+                <tr class="fw-bold border-top">
+                    <td>Total Potongan</td>
+                    <td class="text-end text-danger">
+                        {{ payroll.total_potongan | rupiah }}
+                    </td>
+                </tr>
+<tfoot>
+<tr class="fw-bold">
+    <td colspan="2">Total Kasbon</td>
+    <td class="text-end">
+        {{ total_kasbon_terpilih | rupiah }}
+    </td>
+</tr>
+</tfoot>
+            </table>
+
+        </div>
+
+    </div>
+</div>
+
+</div>
+
+{% if kasbon_list %}
+
+<div class="card shadow-sm mt-4">
+
+<div class="card-header">
+    Detail Kasbon
+</div>
+
+<div class="card-body">
+
+    <table class="table table-sm">
+
+        <thead>
+            <tr>
+                <th>Tanggal</th>
+                <th>Keterangan</th>
+                <th class="text-end">Jumlah</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for k in kasbon_list %}
+            <tr>
+                <td>{{ k.tanggal.strftime('%d-%m-%Y') }}</td>
+                <td>{{ k.keterangan }}</td>
+                <td class="text-end">
+                    {{ k.jumlah | rupiah }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+    </table>
+
+</div>
+
+</div>
+{% endif %}
+
+{% if service_motor_list %}
+
+<div class="card shadow-sm mt-4">
+
+<div class="card-header">
+    Detail Service Motor
+</div>
+
+<div class="card-body">
+
+    <table class="table table-sm">
+
+        <thead>
+            <tr>
+                <th>Tanggal</th>
+                <th>Keterangan</th>
+                <th class="text-end">Potongan</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for s in service_motor_list %}
+            <tr>
+                <td>{{ s.tanggal.strftime('%d-%m-%Y') }}</td>
+                <td>Service Motor</td>
+                <td class="text-end text-danger">
+                    {{ s.porsi_teknisi | rupiah }}
+                </td>
+            </tr>
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+</div>
+{% endif %}
+
+<div class="card mt-4 border-success shadow">
+
+<div class="card-body text-center">
+
+    <h6 class="text-muted">
+        GAJI BERSIH DITERIMA
+    </h6>
+
+    <h1 class="fw-bold text-success">
+        {{ payroll.gaji_bersih | rupiah }}
+    </h1>
+
+</div>
+
+</div>
+
+<a href="{{ url_for('payroll_index') }}"
+class="btn btn-secondary mt-3">
+Kembali </a>
+
+{% endblock %}

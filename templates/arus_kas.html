@@ -1,0 +1,9 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<h3>Laporan Arus Kas - {{ bulan }}/{{ tahun }}</h3>
+<table class="table">
+  <tr><th>Kas Masuk</th><td>Rp {{ "{:,.0f}".format(kas_masuk) }}</td></tr>
+  <tr><th>Kas Keluar</th><td>Rp {{ "{:,.0f}".format(kas_keluar) }}</td></tr>
+  <tr class="table-info"><th>Saldo</th><td>Rp {{ "{:,.0f}".format(saldo) }}</td></tr>
+</table>
+{% endblock %}
