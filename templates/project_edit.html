@@ -1,0 +1,87 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="project-shell">
+  <div class="project-header">
+    <div>
+      <div class="project-breadcrumb"><i class="bi bi-kanban"></i> Proyek / {{ project.kode }}</div>
+      <h2>Edit Proyek</h2>
+    </div>
+    <div class="project-header-actions">
+      <a class="btn-soft" href="{{ url_for('projects', project_id=project.id) }}"><i class="bi bi-arrow-left"></i> Kembali</a>
+    </div>
+  </div>
+
+  <form method="post" class="project-form">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Kode Proyek</label>
+        <input class="form-control" value="{{ project.kode }}" readonly>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Nama Proyek</label>
+        <input class="form-control" name="nama" value="{{ project.nama }}" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Jenis Proyek</label>
+        <select class="form-select" name="tipe" id="project-type" required>
+          {% for tipe in ['Customer', 'Vendor'] %}
+            <option value="{{ tipe }}" {% if project.tipe == tipe %}selected{% endif %}>{{ tipe }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6" id="customer-field">
+        <label class="form-label">Customer</label>
+        <select class="form-select" name="customer_id">
+          <option value="">Pilih customer</option>
+          {% for customer in customers %}
+            <option value="{{ customer.id }}" {% if project.customer_id == customer.id %}selected{% endif %}>{{ customer.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6" id="vendor-field">
+        <label class="form-label">Nama Vendor</label>
+        <input class="form-control" name="vendor" value="{{ project.vendor or '' }}" placeholder="Nama vendor">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Mulai</label>
+        <input class="form-control" type="date" name="periode_mulai" value="{{ project.periode_mulai.isoformat() if project.periode_mulai else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Selesai</label>
+        <input class="form-control" type="date" name="periode_selesai" value="{{ project.periode_selesai.isoformat() if project.periode_selesai else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" name="status">
+          {% for status in ['Berjalan', 'Selesai', 'Dibatalkan'] %}
+            <option {% if project.status == status %}selected{% endif %}>{{ status }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Catatan</label>
+        <textarea class="form-control" name="catatan" rows="3">{{ project.catatan or '' }}</textarea>
+      </div>
+      <div class="col-12 d-flex justify-content-end gap-2">
+        <a class="btn-soft" href="{{ url_for('projects', project_id=project.id) }}">Batal</a>
+        <button class="btn-primary-soft" type="submit"><i class="bi bi-check2"></i> Simpan Perubahan</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  const projectType = document.getElementById('project-type');
+  const customerField = document.getElementById('customer-field');
+  const vendorField = document.getElementById('vendor-field');
+
+  function updateProjectPartyFields() {
+    const isVendor = projectType.value === 'Vendor';
+    customerField.hidden = isVendor;
+    vendorField.hidden = !isVendor;
+  }
+
+  projectType.addEventListener('change', updateProjectPartyFields);
+  updateProjectPartyFields();
+</script>
+{% endblock %}

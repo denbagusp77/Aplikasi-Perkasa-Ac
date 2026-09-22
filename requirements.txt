@@ -1,7 +1,11 @@
 Flask>=3.0
 Flask-Login
 Flask-SQLAlchemy
+Flask-Migrate
 pandas
 openpyxl
 requests
 weasyprint
+pdfkit
+reportlab
+qrcode

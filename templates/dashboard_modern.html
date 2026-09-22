@@ -24,172 +24,630 @@
     box-shadow: 0 0 6px rgba(0,0,0,0.2);
   }
   .badge-modern { font-size: .75rem; padding: .35em .6em; }
+  .hero-card{
+
+background:linear-gradient(135deg,#2563eb,#06b6d4);
+
+border-radius:30px;
+
+overflow:hidden;
+
+}
+
+.hero-stat{
+
+background:rgba(255,255,255,.15);
+
+backdrop-filter:blur(10px);
+
+padding:20px;
+
+border-radius:20px;
+
+text-align:center;
+
+color:white;
+
+transition:.3s;
+
+}
+
+.hero-stat:hover{
+
+transform:translateY(-5px);
+
+background:rgba(255,255,255,.25);
+
+}
+
+.hero-stat h2{
+
+font-weight:700;
+
+margin-bottom:5px;
+
+}
+
+.hero-stat small{
+
+font-size:14px;
+
+color:white;
+
+}
+
+.quick-action-shell {
+  background: rgba(255,255,255,.9);
+  border: 1px solid #edf1f5;
+  border-radius: 22px;
+  box-shadow: 0 10px 26px rgba(19, 35, 51, 0.05);
+  overflow: hidden;
+}
+
+.quick-action-shell .card-body {
+  padding: 20px 18px 18px;
+}
+
+.quick-action-shell .section-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0;
+  color: #1e2d3d;
+}
+
+.quick-action-shell .section-title i {
+  color: #1d6fd6;
+  margin-right: 8px;
+}
+
+.quick-action-shell .mini-badge {
+  background: #eaf3ff;
+  color: #1d6fd6;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-action-shell .row.g-3 {
+  --bs-gutter-x: 14px;
+  --bs-gutter-y: 14px;
+}
+
+.quick-menu {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:18px 12px;
+  border-radius:18px;
+  background:#f8fafc;
+  border:1px solid #edf2f7;
+  text-decoration:none;
+  color:#1b2a3a;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+  transition:.25s ease;
+  min-height: 122px;
+  text-align:center;
+}
+
+.quick-menu:hover {
+  transform: translateY(-3px);
+  background: linear-gradient(180deg, #ffffff 0%, #edf5ff 100%);
+  border-color: #d7e7ff;
+  box-shadow: 0 12px 22px rgba(29, 111, 214, 0.08);
+  color: #0d5ed7;
+}
+
+.quick-menu i {
+  font-size: 2.2rem;
+  margin:0;
+}
+
+.quick-menu span {
+  font-weight: 700;
+  font-size: .98rem;
+}
+
+.quick-menu .icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display:grid;
+  place-items:center;
+  background: #fff;
+  border: 1px solid #edf2f7;
+}
+
+.quick-menu:hover .icon-wrap {
+  background: #eef5ff;
+  border-color: #d7e7ff;
+}
+
+}
+
+.kpi-card:hover{
+
+transform:translateY(-8px);
+
+}
+
+.kpi-card::before{
+
+content:"";
+
+position:absolute;
+
+width:180px;
+
+height:180px;
+
+background:rgba(255,255,255,.12);
+
+border-radius:50%;
+
+right:-70px;
+
+top:-70px;
+
+}
+
+.kpi-card h2{
+
+font-size:34px;
+
+font-weight:700;
+
+margin-bottom:0;
+
+}
+
+.kpi-card h4{
+
+font-weight:700;
+
+margin-bottom:0;
+
+}
+
+.kpi-card small{
+
+font-size:15px;
+
+opacity:.9;
+
+}
+
+.kpi-card span{
+
+font-size:13px;
+
+opacity:.85;
+
+}
+
+.kpi-card i{
+
+font-size:55px;
+
+opacity:.28;
+
+}
+/* ================= QUICK MENU ================= */
+
+.quick-menu{
+
+display:flex;
+
+flex-direction:column;
+
+align-items:center;
+
+justify-content:center;
+
+padding:22px;
+
+border-radius:20px;
+
+background:white;
+
+text-decoration:none;
+
+color:#333;
+
+box-shadow:0 8px 25px rgba(0,0,0,.07);
+
+transition:.35s;
+
+height:130px;
+
+}
+
+.quick-menu:hover{
+
+transform:translateY(-6px);
+
+background:#0d6efd;
+
+color:white;
+
+}
+
+.quick-menu i{
+
+font-size:42px;
+
+margin-bottom:12px;
+
+}
+
+.quick-menu span{
+
+font-weight:600;
+
+}
+
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h3 class="fw-bold text-primary">
-    <i class="bi bi-speedometer2 me-2"></i> Dashboard
-  </h3>
+<!-- HERO HEADER -->
+
+<div class="card border-0 shadow-lg mb-4 hero-card">
+
+    <div class="card-body p-5">
+
+        <div class="row align-items-center">
+
+            <div class="col-lg-8">
+
+                <span class="badge bg-light text-primary px-3 py-2 mb-3">
+
+                    {{ company_profile.name.upper() }} MANAGEMENT
+
+                </span>
+
+                <h1 class="fw-bold text-white">
+
+                    👋 Selamat Datang,
+
+                    {{ current_user.username }}
+
+                </h1>
+
+                <p class="text-white-50 fs-5">
+
+                    Kelola seluruh operasional {{ company_profile.name }} dari satu dashboard modern.
+
+                </p>
+
+                <div class="row mt-4">
+
+                    <div class="col-md-4">
+
+                        <div class="hero-stat">
+
+                            <h2>{{ today_services }}</h2>
+
+                            <small>Service Hari Ini</small>
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="hero-stat">
+
+                            <h2>{{ unpaid_services|length }}</h2>
+
+                            <small>Invoice Pending</small>
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="hero-stat">
+
+                            <h2>{{ auto_reminders|length }}</h2>
+
+                            <small>Reminder</small>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-lg-4 text-center">
+
+                <i class="bi bi-fan display-1 text-white opacity-75"></i>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ================= QUICK ACTION ================= -->
+
+<div class="quick-action-shell mb-4">
+
+    <div class="card-body">
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+
+            <h5 class="section-title mb-0">
+
+                <i class="bi bi-lightning-charge-fill"></i>
+
+                Quick Action
+
+            </h5>
+
+            <span class="mini-badge">Menu Cepat</span>
+
+        </div>
+
+        <div class="row g-3">
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <a href="{{ url_for('customers_new') }}" class="quick-menu">
+                    <div class="icon-wrap"><i class="bi bi-person-plus-fill"></i></div>
+                    <span>Customer</span>
+                </a>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <a href="{{ url_for('customers') }}" class="quick-menu">
+                    <div class="icon-wrap"><i class="bi bi-tools"></i></div>
+                    <span>Service</span>
+                </a>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <a href="{{ url_for('transaction_new') }}" class="quick-menu">
+                    <div class="icon-wrap"><i class="bi bi-wallet2"></i></div>
+                    <span>Transaksi</span>
+                </a>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <a href="{{ url_for('add_employee') }}" class="quick-menu">
+                    <div class="icon-wrap"><i class="bi bi-person-badge-fill"></i></div>
+                    <span>Teknisi</span>
+                </a>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <a href="{{ url_for('kasbon_tambah') }}" class="quick-menu">
+                    <div class="icon-wrap"><i class="bi bi-cash-stack"></i></div>
+                    <span>Kasbon</span>
+                </a>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <a href="{{ url_for('payroll_index') }}" class="quick-menu">
+                    <div class="icon-wrap"><i class="bi bi-credit-card-2-front-fill"></i></div>
+                    <span>Payroll</span>
+                </a>
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
 
 <!-- 📊 Statistik -->
-<div class="row g-3 mb-4">
-  {% for label, val, icon, color in [
-    ('Customers', total_customers, 'people-fill', 'primary'),
-    ('Units', total_units, 'cpu-fill', 'info'),
-    ('Service Hari Ini', today_services, 'wrench-adjustable', 'warning'),
-    ('Pendapatan Bulan Ini', 'Rp ' ~ '{:,.0f}'.format(revenue), 'wallet2', 'success')
-  ] %}
-  <div class="col-md-3">
-    <div class="card-glass rounded-4 p-3 text-center h-100">
-      <div class="fs-3 text-{{ color }}"><i class="bi bi-{{ icon }}"></i></div>
-      <div class="fw-bold text-{{ color }} h5 mt-2">{{ val }}</div>
-      <small class="text-muted">{{ label }}</small>
-    </div>
-  </div>
-  {% endfor %}
-</div>
+<!-- ================= KPI PREMIUM ================= -->
 
-<div class="card-glass rounded-4 p-4 mb-4 text-center">
-  <h5 class="fw-semibold text-success">Total Keseluruhan Pendapatan</h5>
-  <p class="display-6 fw-bold text-success mb-0">
-    Rp {{ "{:,.0f}".format(total_all_revenue) }}
-  </p>
-</div>
+<div class="row g-4 mb-4">
 
-<div class="row">
-  <!-- 🛎 Kolom kiri -->
-  <div class="col-lg-6">
-    <!-- 🔔 Auto Reminders -->
-    <div class="card-glass rounded-4 p-3 mb-4">
-      <h5 class="fw-semibold mb-3 text-primary"><i class="bi bi-bell-fill me-2"></i> Auto Reminders</h5>
-      {% if auto_reminders %}
-        {% for r in auto_reminders %}
-          <div class="d-flex align-items-center mb-3">
-            <div class="fs-4 text-primary me-3"><i class="bi bi-calendar-event-fill"></i></div>
-            <div class="flex-fill">
-              <div class="fw-bold">{{ r.nama }}</div>
-              <small class="text-muted">{{ r.unit }} | {{ r.tanggal.strftime("%d-%m-%Y") }}</small>
-            </div>
-            <span class="badge-modern 
-              {% if r.tipe == 'H-7' %} bg-warning text-dark
-              {% elif r.tipe == 'H-1' %} bg-danger
-              {% else %} bg-success {% endif %}">
-              {{ r.tipe }}
-            </span>
-          </div>
-        {% endfor %}
-      {% else %}
-        <p class="text-muted fst-italic">Tidak ada reminder terdekat</p>
-      {% endif %}
-    </div>
+    <div class="col-xl-3 col-md-6">
 
-    <!-- 🕒 Aktivitas Terakhir -->
-    <div class="card-glass rounded-4 p-3 mb-4 position-relative shadow-sm">
-      <h5 class="fw-semibold mb-4 text-secondary">
-        <i class="bi bi-clock-history me-2"></i> Aktivitas Terakhir
-      </h5>
-      {% if recent_services %}
-        <div class="timeline-line"></div>
-        {% for s in recent_services[:5] %}
-          <div class="mb-4 position-relative ps-5">
-            <span class="timeline-dot" style="top:8px;"></span>
-            <div class="d-flex justify-content-between">
-              <div>
-                <div class="fw-bold">{{ s.ac_unit.customer.nama }}</div>
-                <small class="text-muted">{{ s.tanggal.strftime("%d-%m-%Y") }} — {{ s.jenis_service }}</small>
-              </div>
-              <div class="text-end">
-                <div class="fw-bold text-success">
-                  Rp {{ '{:,.0f}'.format((s.harga_satuan|float) * (s.jumlah|int)) }}
-                </div>
-                <a href="{{ url_for('invoice_detail', id=s.id) }}" 
-                   class="btn btn-sm btn-outline-primary mt-1 rounded-pill px-3 py-0">
-                  Invoice
-                </a>
-              </div>
-            </div>
-          </div>
-        {% endfor %}
-      {% else %}
-        <p class="text-muted fst-italic">Belum ada aktivitas</p>
-      {% endif %}
-    </div>
-  </div>
-<!-- ❗ Kolom Kanan -->
-<div class="col-lg-6">
+        <div class="kpi-card bg-primary">
 
-  <!-- 📢 Klaim Customer -->
-  <div class="card-glass rounded-4 p-3 mb-4">
-    <h5 class="fw-semibold text-primary">
-      <i class="bi bi-flag-fill me-2"></i> Klaim Customer
-    </h5>
-
-    {% if customers %}
-      {% for c in customers %}
-        {% set pending_claims = c.claims|selectattr("status", "equalto", "Pending")|list|length %}
-        {% set done_claims = c.claims|selectattr("status", "equalto", "Selesai")|list|length %}
-
-        <div class="mb-2 p-2 border rounded-3 d-flex justify-content-between align-items-center">
-          <div>
-            <strong>{{ c.nama }}</strong>
-          </div>
-          <div>
-            <span class="badge bg-warning text-dark me-1">Pending: {{ pending_claims }}</span>
-            <span class="badge bg-success">Selesai: {{ done_claims }}</span>
-            <a href="{{ url_for('claim_list', customer_id=c.id) }}" 
-               class="btn btn-sm btn-outline-primary ms-2 rounded-pill px-3 py-0">
-               Lihat
-            </a>
-          </div>
-        </div>
-      {% endfor %}
-    {% else %}
-      <p class="text-muted fst-italic">Belum ada klaim customer</p>
-    {% endif %}
-    <div class="text-end mt-2">
-      <a href="{{ url_for('claim_list_all') }}" class="btn btn-sm btn-outline-primary rounded-pill">
-        Lihat Semua
-      </a>
-    </div>
-  </div>
-
-  <!-- ❗ Belum Lunas (pindahkan ke bawah Klaim Customer) -->
-  <div class="card-glass rounded-4 p-3 mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="fw-semibold text-danger">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i> Belum Lunas
-      </h5>
-      <a href="{{ url_for('unpaid_list') }}" 
-         class="btn btn-outline-danger btn-sm rounded-pill px-3">
-        Lihat Semua
-      </a>
-    </div>
-    {% if unpaid_services %}
-      <div class="list-group list-group-flush">
-        {% for s in unpaid_services[:5] %}
-          <div class="list-group-item d-flex justify-content-between align-items-center">
             <div>
-              <div class="fw-bold">{{ s.ac_unit.customer.nama }}</div>
-              <small class="text-muted">
-                {{ s.jenis_service }} — {{ s.tanggal.strftime("%d-%m-%Y") }}
-              </small>
+
+                <small>Total Customer</small>
+
+                <h2>{{ total_customers }}</h2>
+
+                <span>Customer Aktif</span>
+
             </div>
-            <div class="text-end">
-              <span class="badge bg-danger">
-                Rp {{ '{:,.0f}'.format((s.harga_satuan or 0) * (s.jumlah or 1)) }}
-              </span>
-              <a href="{{ url_for('service_edit', id=s.id)}}" 
-                 class="btn btn-sm btn-outline-secondary ms-2 rounded-pill px-3">
-                Edit
-              </a>
+
+            <i class="bi bi-people-fill"></i>
+
+        </div>
+
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="kpi-card bg-success">
+
+            <div>
+
+                <small>Total Unit AC</small>
+
+                <h2>{{ total_units }}</h2>
+
+                <span>Terdaftar</span>
+
             </div>
+
+            <i class="bi bi-fan"></i>
+
+        </div>
+
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="kpi-card bg-warning">
+
+            <div>
+
+                <small>Service Hari Ini</small>
+
+                <h2>{{ today_services }}</h2>
+
+                <span>Pekerjaan</span>
+
+            </div>
+
+            <i class="bi bi-tools"></i>
+
+        </div>
+
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="kpi-card bg-danger">
+
+            <div>
+
+                <small>Pendapatan Bulan Ini</small>
+
+                <h4>
+
+                    Rp {{ "{:,.0f}".format(revenue) }}
+
+                </h4>
+
+                <span>Omzet</span>
+
+            </div>
+
+            <i class="bi bi-wallet2"></i>
+
+        </div>
+
+    </div>
+
+</div>
+<div class="row g-4 mb-4">
+
+    <div class="col-lg-8">
+
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+
+            <div class="card-header bg-white border-0">
+
+                <h5 class="fw-bold mb-0">
+
+                    📈 Pendapatan 12 Bulan
+
+                </h5>
+
+            </div>
+
+            <div class="card-body">
+
+                <canvas id="revenueChart"
+                        height="120"></canvas>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-lg-4">
+
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+
+            <div class="card-header bg-white border-0">
+
+                <h5 class="fw-bold">
+
+                    Target Bulan Ini
+
+                </h5>
+
+            </div>
+
+            <div class="card-body text-center">
+
+                <div class="display-5 fw-bold text-success">
+
+                    72%
+
+                </div>
+
+                <div class="progress mt-4"
+                     style="height:14px;">
+
+                    <div class="progress-bar bg-success"
+                         style="width:72%">
+
+                    </div>
+
+                </div>
+
+                <small class="text-muted">
+
+                    Target Rp50.000.000
+
+                </small>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+  <!-- Ringkasan operasional: satu sumber ringkas untuk status utama -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-4">
+      <div class="card-glass rounded-4 p-3 h-100 border-start border-4 border-warning">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <small class="text-muted text-uppercase fw-bold">Klaim Pending</small>
+            <div class="display-6 fw-bold text-warning">{{ pending_claim_total }}</div>
+            <span class="text-muted small">Perlu ditindaklanjuti</span>
           </div>
-        {% endfor %}
+          <i class="bi bi-flag-fill fs-2 text-warning"></i>
+        </div>
+        <a href="{{ url_for('claim_list_all', tab='claim') }}" class="btn btn-sm btn-outline-warning mt-3">Buka Klaim</a>
       </div>
-    {% else %}
-      <p class="text-muted fst-italic">Tidak ada tagihan tertunda</p>
-    {% endif %}
+    </div>
+    <div class="col-lg-4">
+      <div class="card-glass rounded-4 p-3 h-100 border-start border-4 border-danger">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <small class="text-muted text-uppercase fw-bold">Tagihan Belum Lunas</small>
+            <div class="display-6 fw-bold text-danger">{{ unpaid_total }}</div>
+            <span class="text-muted small">Rp {{ "{:,.0f}".format(unpaid_amount) }}</span>
+          </div>
+          <i class="bi bi-exclamation-triangle-fill fs-2 text-danger"></i>
+        </div>
+        <a href="{{ url_for('unpaid_list', tab='unpaid') }}" class="btn btn-sm btn-outline-danger mt-3">Buka Tagihan</a>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card-glass rounded-4 p-3 h-100 border-start border-4 border-info">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <small class="text-muted text-uppercase fw-bold">Aktivitas Hari Ini</small>
+            <div class="display-6 fw-bold text-info">{{ today_services }}</div>
+            <span class="text-muted small">Service tercatat hari ini</span>
+          </div>
+          <i class="bi bi-calendar-check-fill fs-2 text-info"></i>
+        </div>
+        <a href="{{ url_for('customers') }}" class="btn btn-sm btn-outline-info mt-3">Kelola Service</a>
+      </div>
+    </div>
   </div>
 
   <!-- ⭐ Best Seller -->

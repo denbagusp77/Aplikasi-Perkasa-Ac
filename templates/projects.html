@@ -1,0 +1,849 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<style>
+  .project-shell {
+    background: #f3f5f8;
+    border-radius: 18px;
+    padding: 18px 18px 24px;
+  }
+  .project-breadcrumb {
+    color: #6b7280;
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .project-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .project-header h2 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1f2d3d;
+  }
+  .project-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-soft {
+    border: 1px solid #dfe7f0;
+    background: #fff;
+    color: #1d2d3d;
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .btn-primary-soft {
+    border: none;
+    background: linear-gradient(180deg, #1f6fe5 0%, #0f58be 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-weight: 700;
+    box-shadow: 0 8px 18px rgba(31,111,229,.18);
+  }
+  .project-header-actions .btn-soft,
+  .project-header-actions .btn-primary-soft,
+  .project-title-wrap .btn-soft,
+  .panel-head .btn-soft {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .project-form {
+    border: 1px solid #dfeaf5;
+    background: #f8fbff;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .project-form .form-label {
+    color: #53677d;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+  .tab-btn { cursor: pointer; }
+  .report-view[hidden] { display: none !important; }
+  .project-panel {
+    background: #fff;
+    border: 1px solid #e8edf5;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(11, 31, 56, .05);
+    padding: 18px 18px 10px;
+  }
+  .project-filters {
+    display: grid;
+    grid-template-columns: 1.5fr .8fr 1fr .8fr;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .filter-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 72px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #e6edf4;
+    padding: 10px 12px;
+  }
+  .filter-box .icon-box {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .icon-blue { background: #edf4ff; color: #1f6fe5; }
+  .icon-green { background: #edfaf4; color: #23a763; }
+  .icon-orange { background: #fff7e8; color: #e6a623; }
+  .icon-purple { background: #f2edff; color: #8064e8; }
+  .filter-label {
+    display: block;
+    color: #6f7f91;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .filter-value {
+    display: block;
+    color: #1e2d3d;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .project-select {
+    width: 100%;
+    min-width: 0;
+    cursor: pointer;
+    border: 0;
+    background-color: transparent;
+    padding: 0 22px 0 0;
+    box-shadow: none !important;
+    color: #1e2d3d;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .project-select:focus { outline: 0; }
+  .status-select {
+    border: 0;
+    background: transparent;
+    color: #1a9d64;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    outline: 0;
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    background: #eafaf1;
+    color: #1a9d64;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    gap: 8px;
+  }
+  .status-pill::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1ca96a;
+    display: inline-block;
+  }
+  .project-title-wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .project-title-wrap .label {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: .08em;
+    font-weight: 800;
+    color: #1f6fe5;
+    background: #eaf3ff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+  }
+  .project-title-wrap h3 {
+    margin: 0;
+    font-size: 2.1rem;
+    font-weight: 800;
+    color: #1c2d3d;
+  }
+  .project-subtitle {
+    margin-top: 6px;
+    color: #6c7d8f;
+    font-size: 14px;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .summary-item {
+    border: 1px solid #dfeaf5;
+    border-radius: 12px;
+    padding: 14px 14px 12px;
+    min-height: 118px;
+    background: #f8fbff;
+  }
+  .summary-item.green { background: linear-gradient(180deg, #edfaf4 0%, #f9fdfb 100%); }
+  .summary-item.orange { background: linear-gradient(180deg, #fff6e7 0%, #fffdf9 100%); }
+  .summary-item.blue { background: linear-gradient(180deg, #edf4ff 0%, #f9fbff 100%); }
+  .summary-item.red { background: linear-gradient(180deg, #fff1f1 0%, #fffdfd 100%); }
+  .summary-item.purple { background: linear-gradient(180deg, #f3efff 0%, #fcfbff 100%); }
+  .summary-icon {
+    width: 28px;
+    height: 28px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 9px;
+    margin-bottom: 10px;
+  }
+  .summary-item.green .summary-icon { background: #d8f5e7; color: #1ca96a; }
+  .summary-item.orange .summary-icon { background: #ffebc3; color: #d9991a; }
+  .summary-item.red .summary-icon { background: #ffd7d7; color: #d95151; }
+  .summary-item.blue .summary-icon { background: #dceaff; color: #1d6fd6; }
+  .summary-item.purple .summary-icon { background: #e4dcff; color: #8064e8; }
+  .summary-label {
+    display: block;
+    color: #64758a;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .summary-value {
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.2;
+    font-weight: 800;
+    color: #1d2d3d;
+  }
+  .summary-meta {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #74839a;
+  }
+  .text-green { color: #1ca96a; }
+  .text-orange { color: #d9991a; }
+  .text-blue { color: #1d6fd6; }
+  .text-red { color: #d95151; }
+  .tab-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 18px;
+  }
+  .tab-btn {
+    border: 1px solid #dde7f1;
+    color: #53677d;
+    background: #fff;
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .tab-btn.active {
+    background: #1f6fe5;
+    border-color: #1f6fe5;
+    color: white;
+    box-shadow: 0 8px 18px rgba(31,111,229,.15);
+  }
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  .panel-box {
+    background: white;
+    border: 1px solid #e8edf5;
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #1d2d3d;
+    font-weight: 800;
+    margin-bottom: 14px;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #53677d;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    height: 180px;
+    border-bottom: 1px solid #edf2f7;
+    padding-top: 6px;
+  }
+  .chart-col {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    height: 150px;
+    position: relative;
+    padding-bottom: 28px;
+  }
+  .bar-pair {
+    height: 122px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 5px;
+  }
+  .bar-green, .bar-red {
+    width: 22px;
+    max-width: 42px;
+    border-radius: 8px 8px 0 0;
+    min-height: 2px;
+  }
+  .bar-green { background: linear-gradient(180deg, #3ed08a 0%, #1ca96a 100%); }
+  .bar-red { background: linear-gradient(180deg, #f07b78 0%, #e14d4e 100%); }
+  .chart-label {
+    position: absolute;
+    bottom: 0;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #6c7d8f;
+    text-align: center;
+  }
+  .donut-wrap {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 18px;
+    min-height: 220px;
+    flex-wrap: wrap;
+  }
+  .donut-chart {
+    position: relative;
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    background: conic-gradient({% for item in selected_project.expense_breakdown if selected_project %}{{ item.color }} {{ item.start }}% {{ item.end }}%{% if not loop.last %}, {% endif %}{% else %}#dfe9f2 0 100%{% endfor %});
+  }
+  .donut-chart::before {
+    content: "";
+    position: absolute;
+    inset: 28px;
+    background: white;
+    border-radius: 50%;
+  }
+  .donut-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    z-index: 2;
+  }
+  .donut-center .title {
+    font-size: 12px;
+    color: #6c7d8f;
+    font-weight: 700;
+  }
+  .donut-center .amount {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #1d2d3d;
+    line-height: 1.1;
+  }
+  .expense-legend {
+    display: grid;
+    gap: 8px;
+    min-width: 130px;
+  }
+  .expense-legend-item {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    align-items: center;
+    gap: 7px;
+    color: #53677d;
+    font-size: 11px;
+  }
+  .expense-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+  .expense-empty {
+    color: #8090a3;
+    font-size: 12px;
+    text-align: center;
+  }
+  .table-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 6px;
+  }
+  .table-box {
+    border: 1px solid #e8edf5;
+    border-radius: 14px;
+    background: #fff;
+    padding: 16px 16px 8px;
+  }
+  .table-box .head {
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #1d2d3d;
+    font-weight: 800;
+  }
+  .table-box .head a {
+    text-decoration: none;
+    color: #1d6fd6;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #edf2f7;
+    text-align: left;
+    font-size: 13px;
+    color: #3d4d5f;
+  }
+  th {
+    color: #586e82;
+    font-weight: 700;
+  }
+  .status-tag {
+    display: inline-block;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+  }
+  .status-green { background: #1ca96a; }
+  .status-red { background: #e15b5b; }
+  .status-neutral { background: #dfe8f4; color: #4f6481; }
+  @media (max-width: 860px) {
+    .project-filters, .summary-grid, .chart-grid, .table-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="project-shell">
+  <div class="project-breadcrumb">
+    <span>Laporan Keuangan</span>
+    <span>›</span>
+    <span>Proyek</span>
+  </div>
+
+  <div class="project-header">
+    <h2>Laporan Keuangan Proyek</h2>
+    <div class="project-header-actions">
+      <a class="btn-soft" href="{{ url_for('dashboard') }}"><i class="bi bi-arrow-left"></i>Kembali</a>
+      <a class="btn-primary-soft" href="{{ url_for('projects', new=1) }}#project-form"><i class="bi bi-plus-lg"></i>Proyek Baru</a>
+    </div>
+  </div>
+
+  <div class="project-panel">
+    {% if request.args.get('new') == '1' %}
+    <form id="project-form" class="project-form" method="post" action="{{ url_for('projects') }}">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <strong>Tambah Proyek Baru</strong>
+        <a class="btn-soft" href="{{ url_for('projects') }}"><i class="bi bi-x-lg"></i>Tutup</a>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-3"><label class="form-label">Kode Proyek</label><input class="form-control" value="Otomatis saat disimpan" readonly></div>
+        <div class="col-md-5"><label class="form-label">Nama Proyek</label><input class="form-control" name="nama" required></div>
+        <div class="col-md-4"><label class="form-label">Customer</label><select class="form-select" name="customer_id"><option value="">Pilih customer</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.nama }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="form-label">Jenis Proyek</label><select class="form-select" name="tipe"><option>Customer</option><option>Vendor</option></select></div>
+        <div class="col-md-3"><label class="form-label">Mulai</label><input class="form-control" type="date" name="periode_mulai"></div>
+        <div class="col-md-3"><label class="form-label">Selesai</label><input class="form-control" type="date" name="periode_selesai"></div>
+        <div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><option>Berjalan</option><option>Selesai</option><option>Dibatalkan</option></select></div>
+        <div class="col-md-3 d-flex align-items-end"><button class="btn-primary-soft w-100" type="submit"><i class="bi bi-check2"></i>Simpan Proyek</button></div>
+      </div>
+    </form>
+    {% endif %}
+    <div class="project-filters">
+      <div class="filter-box">
+        <div class="icon-box icon-blue"><i class="bi bi-building"></i></div>
+        <div>
+          <span class="filter-label">Pilih Proyek</span>
+          <form method="get" action="{{ url_for('projects') }}">
+            <select name="project_id" class="form-select form-select-sm project-select" onchange="this.form.submit()" aria-label="Pilih proyek">
+              {% for row in projects %}
+                <option value="{{ row.project.id }}" {% if selected_project and row.project.id == selected_project.project.id %}selected{% endif %}>{{ row.project.kode }} · {{ row.project.nama }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+      </div>
+
+      <div class="filter-box">
+        <div class="icon-box icon-purple"><i class="bi bi-buildings"></i></div>
+        <div>
+          <span class="filter-label">Jenis Proyek</span>
+          <span class="filter-value">{{ selected_project.project.tipe if selected_project else 'Customer / Vendor' }}</span>
+        </div>
+      </div>
+
+      <div class="filter-box">
+        <div class="icon-box icon-green"><i class="bi bi-calendar3"></i></div>
+        <div>
+          <span class="filter-label">Periode</span>
+          <span class="filter-value">{{ selected_project.project.periode_mulai.strftime('%B %Y') if selected_project and selected_project.project.periode_mulai else 'Belum diatur' }}</span>
+        </div>
+      </div>
+
+      <div class="filter-box">
+        <div class="icon-box icon-orange"><i class="bi bi-check2-circle"></i></div>
+        <div>
+          <span class="filter-label">Status</span>
+          <form method="get" action="{{ url_for('projects') }}">
+            {% if selected_project %}<input type="hidden" name="project_id" value="{{ selected_project.project.id }}">{% endif %}
+            <select name="status" class="status-select" onchange="this.form.submit()" aria-label="Filter status proyek">
+              <option value="">Semua Status</option>
+              {% for status in ['Berjalan', 'Selesai', 'Dibatalkan'] %}
+                <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status if not selected_project or status_filter else (selected_project.project.status if selected_project.project.status == status else status) }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+      </div>
+
+      {% if selected_project %}
+        <a class="btn-soft project-edit-button" href="{{ url_for('project_edit', id=selected_project.project.id) }}">
+          <i class="bi bi-pencil-square"></i> Edit Proyek
+        </a>
+      {% endif %}
+    </div>
+
+    {% set p = selected_project.project if selected_project else none %}
+    <div class="project-title-wrap">
+      <div>
+        <span class="label">PROYEK</span>
+        <h3>{{ p.nama if p else 'Tidak ada proyek' }}</h3>
+        {% if p %}
+          <div class="project-subtitle">{{ p.kode }} · {{ p.customer.nama if p.customer else p.vendor or 'Tanpa customer' }}</div>
+        {% endif %}
+      </div>
+      {% if p %}<a class="btn-soft" href="{{ url_for('project_detail', id=p.id) }}"><i class="bi bi-pencil"></i>Edit</a>{% endif %}
+    </div>
+
+    {% set total_jobs = (selected_project.transactions|length if selected_project else 0) %}
+    {% set total_income = selected_project.income if selected_project else 0 %}
+    {% set total_expense = selected_project.expense if selected_project else 0 %}
+    {% set total_paid = selected_project.paid if selected_project else 0 %}
+    {% set total_receivable = selected_project.receivable if selected_project else 0 %}
+    {% set total_profit = selected_project.profit if selected_project else 0 %}
+
+    <div class="summary-grid">
+      <div class="summary-item green">
+        <span class="summary-icon"><i class="bi bi-briefcase-fill"></i></span>
+        <span class="summary-label">Total Pekerjaan</span>
+        <p class="summary-value text-green">Rp {{ '{:,.0f}'.format(total_income) }}</p>
+        <span class="summary-meta">Dari {{ total_jobs }} item pekerjaan</span>
+      </div>
+      <div class="summary-item orange">
+        <span class="summary-icon"><i class="bi bi-receipt"></i></span>
+        <span class="summary-label">Sudah Ditagihkan</span>
+        <p class="summary-value text-orange">Rp {{ '{:,.0f}'.format(total_income) }}</p>
+        <span class="summary-meta">Invoice</span>
+      </div>
+      <div class="summary-item green">
+        <span class="summary-icon"><i class="bi bi-wallet2"></i></span>
+        <span class="summary-label">Sudah Dibayar</span>
+        <p class="summary-value text-green">Rp {{ '{:,.0f}'.format(total_paid) }}</p>
+        <span class="summary-meta">{{ '1 pembayaran' if total_paid else 'Belum ada pembayaran' }}</span>
+      </div>
+      <div class="summary-item red">
+        <span class="summary-icon"><i class="bi bi-file-earmark-text"></i></span>
+        <span class="summary-label">Piutang</span>
+        <p class="summary-value text-red">Rp {{ '{:,.0f}'.format(total_receivable) }}</p>
+        <span class="summary-meta">Belum lunas</span>
+      </div>
+      <div class="summary-item blue">
+        <span class="summary-icon"><i class="bi bi-cash-stack"></i></span>
+        <span class="summary-label">Total Pengeluaran</span>
+        <p class="summary-value text-blue">Rp {{ '{:,.0f}'.format(total_expense) }}</p>
+        <span class="summary-meta">{{ (selected_project.transactions|selectattr('kategori','equalto','Beban')|list|length) if selected_project else 0 }} transaksi</span>
+      </div>
+      <div class="summary-item purple">
+        <span class="summary-icon"><i class="bi bi-bar-chart-fill"></i></span>
+        <span class="summary-label">Laba Proyek</span>
+        <p class="summary-value" style="color:#8064e8;">Rp {{ '{:,.0f}'.format(total_profit) }}</p>
+        <span class="summary-meta">Margin proyek</span>
+      </div>
+    </div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" type="button" data-view="summary"><i class="bi bi-grid-1x2"></i>Ringkasan</button>
+      <button class="tab-btn" type="button" data-view="income"><i class="bi bi-arrow-down-left-circle"></i>Pemasukan</button>
+      <button class="tab-btn" type="button" data-view="expense"><i class="bi bi-arrow-up-right-circle"></i>Pengeluaran</button>
+      <button class="tab-btn" type="button" data-view="receivable"><i class="bi bi-hourglass-split"></i>Piutang</button>
+      <button class="tab-btn" type="button" data-view="cashflow"><i class="bi bi-wallet2"></i>Arus Kas</button>
+      <button class="tab-btn" type="button" data-view="documents"><i class="bi bi-folder2-open"></i>Dokumen</button>
+      <button class="tab-btn" type="button" data-view="history"><i class="bi bi-clock-history"></i>Riwayat</button>
+    </div>
+
+    <div class="chart-grid report-view" data-view-panel="summary cashflow">
+      <div class="panel-box">
+        <div class="panel-head">
+          <span>Grafik Pemasukan vs Pengeluaran</span>
+          <select id="chart-period" class="btn-soft" aria-label="Pilih periode grafik" style="padding:6px 10px; font-size:12px;">
+            <option value="week">Per Minggu</option>
+            <option value="month">Per Bulan</option>
+          </select>
+        </div>
+        <div class="legend-row">
+          <div class="legend-item"><span class="legend-color" style="background:#2bb673"></span> Pemasukan</div>
+          <div class="legend-item"><span class="legend-color" style="background:#eb6060"></span> Pengeluaran</div>
+        </div>
+        <div id="chart-bars" class="chart-bars" data-income="{{ (selected_project.chart_income if selected_project else [0, 0, 0, 0])|tojson }}" data-expense="{{ (selected_project.chart_expense if selected_project else [0, 0, 0, 0])|tojson }}">
+          {% set chart_data = selected_project.chart_income if selected_project else [0, 0, 0, 0] %}
+          {% set chart_data_red = selected_project.chart_expense if selected_project else [0, 0, 0, 0] %}
+          {% set chart_max = ([chart_data|sum, chart_data_red|sum]|max) or 1 %}
+          {% for i in range(4) %}
+          <div class="chart-col">
+            <div class="bar-pair">
+              <div class="bar-green" style="height: {{ ((chart_data[i] / chart_max) * 115)|round(0, 'floor')|int }}px"></div>
+              <div class="bar-red" style="height: {{ ((chart_data_red[i] / chart_max) * 115)|round(0, 'floor')|int }}px"></div>
+            </div>
+            <div class="chart-label">Minggu<br>{{ ['1-7 Sep','8-14 Sep','15-21 Sep','22-30 Sep'][i] }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel-box">
+        <div class="panel-head">
+          <span>Rincian Kategori Pengeluaran</span>
+        </div>
+        <div class="donut-wrap">
+          <div class="donut-chart">
+            <div class="donut-center">
+              <div>
+                <div class="title">Total</div>
+                <div class="amount">Rp {{ '{:,.0f}'.format(total_expense) }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="expense-legend">
+            {% for item in (selected_project.expense_breakdown if selected_project else []) %}
+            <div class="expense-legend-item">
+              <span class="expense-legend-dot" style="background:{{ item.color }}"></span>
+              <span>{{ item.label }}</span>
+              <strong>{{ '{:,.0f}'.format(item.percent) }}%</strong>
+            </div>
+            {% else %}
+            <div class="expense-empty"><i class="bi bi-pie-chart"></i><br>Belum ada kategori pengeluaran.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-grid report-view" data-view-panel="summary income receivable cashflow">
+      <div class="table-box report-view" data-view-panel="summary income receivable cashflow">
+        <div class="head">
+          <span>Pemasukan Terbaru</span>
+          <a href="{{ url_for('transactions') }}?kategori=Pendapatan{% if p %}&project_id={{ p.id }}{% endif %}">Lihat Semua <i class="bi bi-arrow-right"></i></a>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Keterangan</th>
+              <th>Nominal</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set income_rows = [] %}
+            {% for t in (selected_project.transactions if selected_project else []) %}
+              {% if t.kategori == 'Pendapatan' %}
+                {% set _ = income_rows.append(t) %}
+              {% endif %}
+            {% endfor %}
+            {% for t in income_rows[:2] %}
+            <tr>
+              <td>{{ t.tanggal.strftime('%d/%m/%Y') if t.tanggal else '—' }}</td>
+              <td>{{ t.deskripsi or t.jenis or 'Pemasukan' }}</td>
+              <td>Rp {{ '{:,.0f}'.format(t.jumlah) }}</td>
+              <td><span class="status-tag {% if t.status == 'Dibayar' %}status-green{% else %}status-neutral{% endif %}">{{ t.status or 'Diterima' }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted">Belum ada data pemasukan.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-box report-view" data-view-panel="summary expense cashflow">
+        <div class="head">
+          <span>Pengeluaran Terbaru</span>
+          <a href="{{ url_for('transactions') }}?kategori=Beban{% if p %}&project_id={{ p.id }}{% endif %}">Lihat Semua <i class="bi bi-arrow-right"></i></a>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Kategori</th>
+              <th>Keterangan</th>
+              <th>Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set expense_rows = [] %}
+            {% for t in (selected_project.transactions if selected_project else []) %}
+              {% if t.kategori == 'Beban' %}
+                {% set _ = expense_rows.append(t) %}
+              {% endif %}
+            {% endfor %}
+            {% for t in expense_rows[:3] %}
+            <tr>
+              <td>{{ t.tanggal.strftime('%d/%m/%Y') if t.tanggal else '—' }}</td>
+              <td>{{ t.jenis or 'Beban' }}</td>
+              <td>{{ t.deskripsi or 'Pengeluaran' }}</td>
+              <td>Rp {{ '{:,.0f}'.format(t.jumlah) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted">Belum ada pengeluaran.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel-box report-view" data-view-panel="expense" hidden>
+      <div class="panel-head"><span>Daftar Pengeluaran Proyek</span><a class="btn-primary-soft" href="{{ url_for('transactions') }}?kategori=Beban{% if p %}&project_id={{ p.id }}{% endif %}"><i class="bi bi-plus-lg"></i>Tambah Pengeluaran</a></div>
+      <form method="get" action="{{ url_for('projects') }}" class="row g-2 align-items-end mb-3">
+        {% if p %}<input type="hidden" name="project_id" value="{{ p.id }}">{% endif %}
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Kategori</label>
+          <select name="expense_category" class="form-select form-select-sm">
+            <option value="">Semua Kategori</option>
+            <option value="Pendapatan" {% if expense_category == 'Pendapatan' %}selected{% endif %}>Pendapatan</option>
+            <option value="Beban" {% if expense_category == 'Beban' %}selected{% endif %}>Beban</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1">Dari Tanggal</label>
+          <input type="date" name="expense_start" value="{{ expense_start }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1">Sampai Tanggal</label>
+          <input type="date" name="expense_end" value="{{ expense_end }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Cari Jenis/Keterangan</label>
+          <input type="search" name="expense_query" value="{{ expense_query }}" class="form-control form-control-sm" placeholder="Contoh: freon">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+          <a href="{{ url_for('projects', project_id=p.id, status=status_filter) if p else url_for('projects') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
+      </form>
+      <table><thead><tr><th>Tanggal</th><th>Kategori</th><th>Keterangan</th><th>Nominal</th></tr></thead><tbody>
+        {% for t in expense_rows if expense_rows is defined %}{% endfor %}
+        {% set all_expenses = selected_project.transactions|selectattr('kategori','equalto','Beban')|list if selected_project else [] %}
+        {% for t in all_expenses %}<tr><td>{{ t.tanggal.strftime('%d/%m/%Y') if t.tanggal else '—' }}</td><td>{{ t.jenis or 'Beban' }}</td><td>{{ t.deskripsi or 'Pengeluaran' }}</td><td>Rp {{ '{:,.0f}'.format(t.jumlah) }}</td></tr>{% else %}<tr><td colspan="4" class="text-muted">Belum ada data pengeluaran.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+
+    <div class="panel-box report-view" data-view-panel="documents" hidden>
+      <div class="panel-head"><span>Dokumen Proyek</span><span class="status-pill"><i class="bi bi-folder2-open"></i> {{ 'Tersedia' if p and p.catatan else 'Belum ada' }}</span></div>
+      <div class="text-muted"><i class="bi bi-info-circle"></i> Dokumen dan catatan proyek akan ditampilkan di area ini.</div>
+      {% if p and p.catatan %}<div class="mt-3"><strong>Catatan:</strong> {{ p.catatan }}</div>{% endif %}
+    </div>
+
+    <div class="panel-box report-view" data-view-panel="history" hidden>
+      <div class="panel-head"><span>Riwayat Aktivitas Proyek</span></div>
+      <table><thead><tr><th>Tanggal</th><th>Aktivitas</th><th>Kategori</th><th>Nominal</th></tr></thead><tbody>
+        {% for t in (selected_project.transactions if selected_project else []) %}<tr><td>{{ t.tanggal.strftime('%d/%m/%Y') if t.tanggal else '—' }}</td><td>{{ t.deskripsi or t.jenis or 'Transaksi proyek' }}</td><td>{{ t.kategori }}</td><td>Rp {{ '{:,.0f}'.format(t.jumlah) }}</td></tr>{% else %}<tr><td colspan="4" class="text-muted">Belum ada riwayat aktivitas.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var chart = document.querySelector('#chart-bars');
+    var period = document.querySelector('#chart-period');
+    if (chart && period) {
+      var income = JSON.parse(chart.dataset.income || '[]');
+      var expense = JSON.parse(chart.dataset.expense || '[]');
+      var labels = ['1-7 Sep', '8-14 Sep', '15-21 Sep', '22-30 Sep'];
+      function renderChart(mode) {
+        var incomes = mode === 'month' ? [income.reduce(function (a, b) { return a + b; }, 0)] : income;
+        var expenses = mode === 'month' ? [expense.reduce(function (a, b) { return a + b; }, 0)] : expense;
+        var max = Math.max.apply(null, incomes.concat(expenses).concat([1]));
+        chart.innerHTML = incomes.map(function (value, index) {
+          return '<div class="chart-col"><div class="bar-pair"><div class="bar-green" style="height:' + Math.max(2, value / max * 115) + 'px"></div><div class="bar-red" style="height:' + Math.max(2, expenses[index] / max * 115) + 'px"></div></div><div class="chart-label">' + (mode === 'month' ? 'September 2026' : 'Minggu<br>' + labels[index]) + '</div></div>';
+        }).join('');
+      }
+      period.addEventListener('change', function () { renderChart(period.value); });
+      renderChart(period.value);
+    }
+  }());
+  document.querySelectorAll('.tab-btn').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var selectedView = button.dataset.view;
+      document.querySelectorAll('.tab-btn').forEach(function (item) {
+        item.classList.toggle('active', item === button);
+      });
+      document.querySelectorAll('[data-view-panel]').forEach(function (panel) {
+        var views = panel.dataset.viewPanel.split(' ');
+        panel.hidden = !views.includes(selectedView);
+      });
+    });
+  });
+</script>
+{% endblock %}

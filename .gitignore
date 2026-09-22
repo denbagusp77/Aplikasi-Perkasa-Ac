@@ -1,8 +1,41 @@
-
-# Python cache
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 
-# Local database backups
-instance/*.db
+# Virtual environments
+.venv/
+venv/
+venv310/
+env/
 
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Flask
+instance/
+
+# Uploads
+uploads/
+static/uploads/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Temporary
+*.tmp
+*.bak

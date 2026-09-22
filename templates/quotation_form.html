@@ -1,0 +1,174 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<style>
+  :root { --quote-blue: #0867e8; --quote-soft: #edf5ff; --quote-line: #d8e5f2; --quote-ink: #102a43; }
+  .quote-page { max-width: 1440px; margin: 0 auto; color: var(--quote-ink); }
+  .quote-brand { background: #fff; border-bottom: 1px solid var(--quote-line); padding: 10px 4px; }
+  .quote-brand h2 { margin: 0; font-weight: 900; letter-spacing: -.04em; }
+  .quote-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, .8fr); gap: 12px; }
+  .quote-section, .quote-summary { background: #fff; border: 1px solid var(--quote-line); border-radius: 10px; box-shadow: 0 4px 14px rgba(22, 61, 99, .06); }
+  .quote-section { padding: 10px; margin-bottom: 10px; }
+  .quote-title { display: flex; align-items: center; gap: 9px; margin: 0 0 9px; font-size: 1rem; font-weight: 800; }
+  .step { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--quote-blue); color: #fff; }
+  .quote-table { width: 100%; border-collapse: collapse; font-size: .76rem; }
+  .quote-table th { padding: 7px; background: #eaf3ff; white-space: nowrap; }
+  .quote-table td { padding: 5px; border-bottom: 1px solid #e7eef5; vertical-align: middle; }
+  .quote-table select, .quote-table input { padding: 5px 6px; font-size: .75rem; }
+  .money { font-weight: 800; text-align: right; white-space: nowrap; }
+  .choice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .choice-card { height: 100%; padding: 10px; border: 1px solid var(--quote-line); border-radius: 8px; cursor: pointer; }
+  .choice-card.active { background: var(--quote-soft); border-color: var(--quote-blue); box-shadow: 0 0 0 2px rgba(8, 103, 232, .12); }
+  .choice-price { display: block; color: var(--quote-blue); font-size: 1.05rem; font-weight: 900; }
+  .material-tabs { display: flex; gap: 5px; margin-bottom: 7px; }
+  .material-tab { padding: 5px 13px; border: 1px solid var(--quote-line); border-radius: 5px; background: #fff; font-size: .75rem; }
+  .material-tab.active { color: #fff; background: var(--quote-blue); border-color: var(--quote-blue); }
+  .catalog-list { max-height: 235px; overflow: auto; }
+  .catalog-item { display: grid; grid-template-columns: 24px 1fr 95px 62px; gap: 6px; align-items: center; padding: 6px; border-bottom: 1px solid #edf2f7; font-size: .76rem; }
+  .catalog-item input[type=number] { width: 58px; }
+  .quote-summary { position: sticky; top: 10px; height: max-content; padding: 12px; }
+  .summary-box { padding: 10px; margin-bottom: 10px; border-radius: 8px; background: var(--quote-soft); }
+  .summary-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: .8rem; }
+  .summary-total { padding: 10px; margin-top: 7px; border-radius: 8px; background: #e9fbf2; color: #087443; }
+  .summary-total strong { display: block; text-align: center; font-size: 1.45rem; }
+  @media (max-width: 900px) { .quote-grid { grid-template-columns: 1fr; } .quote-summary { position: static; } .choice-grid { grid-template-columns: 1fr; } .table-scroll { overflow: auto; } .quote-table { min-width: 800px; } }
+</style>
+
+<div class="quote-page">
+  <div class="quote-brand d-flex justify-content-between align-items-center mb-2">
+    <div><h2>PERKASA AC</h2><small class="text-muted">Solusi Pendingin Udara Profesional</small></div>
+    <a href="{{ url_for('material_estimates') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-seam"></i> Estimasi Material</a>
+  </div>
+
+  <form method="post" id="quotationForm">
+    <div class="quote-grid">
+      <main>
+        <section class="quote-section">
+          <div class="row g-2">
+            <div class="col-md-6"><label class="form-label small mb-1">Customer</label><select name="customer_id" class="form-select form-select-sm" required><option value="">Pilih customer</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.nama }}</option>{% endfor %}</select></div>
+            <div class="col-md-3"><label class="form-label small mb-1">PIC</label><input name="pic" class="form-control form-control-sm"></div>
+            <div class="col-md-3"><label class="form-label small mb-1">Masa Berlaku</label><input name="berlaku_sampai" type="date" class="form-control form-control-sm"></div>
+            <div class="col-12"><label class="form-label small mb-1">Alamat Proyek</label><input name="alamat" class="form-control form-control-sm"></div>
+          </div>
+        </section>
+
+        <section class="quote-section">
+          <h3 class="quote-title"><span class="step">1</span> Pilih Unit AC <button type="button" class="btn btn-primary btn-sm ms-auto" id="addUnit"><i class="bi bi-plus-lg"></i> Tambah Unit AC</button></h3>
+          <div class="table-scroll"><table class="quote-table"><thead><tr><th>No</th><th>Merk</th><th>Tipe</th><th>PK</th><th>Model</th><th>Harga Unit</th><th>Qty</th><th>Subtotal</th><th>Aksi</th></tr></thead><tbody id="unitList"></tbody></table></div>
+          <div id="unitEmpty" class="py-2 text-center text-muted small">Pilih tambah unit untuk mulai mengisi.</div>
+        </section>
+
+        <section class="quote-section"><h3 class="quote-title"><span class="step">2</span> Pilih Paket Pemasangan <small class="text-muted fw-normal">(per unit)</small></h3><div id="packageList" class="choice-grid"><div class="text-muted small">Memuat paket master...</div></div></section>
+
+        <section class="quote-section"><h3 class="quote-title"><span class="step">3</span> Tambahan Material / Pekerjaan <small class="text-muted fw-normal">(opsional)</small></h3><div class="material-tabs"><button type="button" class="material-tab active" data-kind="materials">Material</button><button type="button" class="material-tab" data-kind="services">Jasa</button></div><div id="catalogList" class="catalog-list border rounded"><div class="p-2 text-muted small">Pilih unit AC dahulu.</div></div></section>
+
+        <section class="quote-section"><label class="form-label small">Keterangan / Permintaan Khusus</label><textarea name="catatan" class="form-control form-control-sm" rows="2"></textarea><div class="row g-2 mt-1"><div class="col-md-4"><label class="small">Diskon</label><input name="diskon" id="discount" type="number" min="0" value="0" class="form-control form-control-sm"></div><div class="col-md-4"><label class="small">PPN %</label><input name="ppn_persen" id="tax" type="number" min="0" value="0" class="form-control form-control-sm"></div><div class="col-md-4"><label class="small">Syarat Pembayaran</label><input name="syarat_pembayaran" class="form-control form-control-sm"></div></div><input name="garansi" type="hidden" value=""><div class="mt-3 text-end"><button type="submit" class="btn btn-primary"><i class="bi bi-file-earmark-text"></i> Buat Penawaran</button></div></section>
+      </main>
+
+      <aside><div class="quote-summary"><h3 class="quote-title"><i class="bi bi-receipt text-primary"></i> Ringkasan Penawaran</h3><div id="unitSummary" class="summary-box">Belum ada unit dipilih.</div><div class="summary-line"><span>Total Harga Unit</span><strong id="unitTotal">Rp 0</strong></div><div class="summary-line"><span>Total Paket</span><strong id="packageTotal">Rp 0</strong></div><div class="summary-line"><span>Total Tambahan</span><strong id="extraTotal">Rp 0</strong></div><div class="summary-line"><span>Diskon</span><strong id="discountTotal">Rp 0</strong></div><div class="summary-total"><span>TOTAL PENAWARAN</span><strong id="grandTotal">Rp 0</strong></div><div class="summary-box mt-3"><strong><i class="bi bi-info-circle"></i> Harga otomatis</strong><br><small>Harga unit, paket, material, dan jasa diambil dari data master aktif.</small></div></div></aside>
+    </div>
+  </form>
+</div>
+
+<script>
+const state = { products: [], materials: [], services: [], packages: [], brands: [], sequence: 0, activeKind: 'materials', extraSelections: {} };
+const money = value => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(value || 0))}`;
+const options = (items, valueKey, labelKey, placeholder) => `<option value="">${placeholder}</option>${items.map(item => `<option value="${item[valueKey]}">${item[labelKey]}</option>`).join('')}`;
+
+function selectedUnits() {
+  return [...document.querySelectorAll('.unit-row')].map(row => {
+    const product = state.products.find(item => item.id === Number(row.querySelector('.unit-product').value));
+    return product ? { row, product, qty: Math.max(Number(row.querySelector('.unit-qty').value) || 1, 1) } : null;
+  }).filter(Boolean);
+}
+
+function selectedExtras() {
+  return [...document.querySelectorAll('.catalog-check:checked')].map(input => ({
+    kind: input.dataset.kind,
+    id: Number(input.value),
+    qty: Math.max(Number(input.closest('.catalog-item').querySelector('.catalog-qty').value) || 1, 1)
+  }));
+}
+
+function createUnit() {
+  state.sequence += 1;
+  const row = document.createElement('tr');
+  row.className = 'unit-row';
+  row.innerHTML = `<td>${state.sequence}</td><td><select class="form-select unit-brand"><option value="">Pilih</option>${state.brands.map(item => `<option value="${item.id}">${item.name}</option>`).join('')}</select></td><td><select class="form-select unit-type" disabled><option>Pilih</option></select></td><td><select class="form-select unit-pk" disabled><option>Pilih</option></select></td><td><select class="form-select unit-product" disabled><option>Pilih model</option></select></td><td class="unit-price money">Rp 0</td><td><input class="form-control unit-qty" type="number" min="1" value="1" disabled></td><td class="unit-subtotal money">Rp 0</td><td><button type="button" class="btn btn-sm btn-outline-danger remove-unit"><i class="bi bi-trash"></i></button></td>`;
+  document.getElementById('unitList').appendChild(row);
+  document.getElementById('unitEmpty').classList.add('d-none');
+  bindUnit(row);
+}
+
+function bindUnit(row) {
+  const brand = row.querySelector('.unit-brand');
+  const type = row.querySelector('.unit-type');
+  const pk = row.querySelector('.unit-pk');
+  const product = row.querySelector('.unit-product');
+  const quantity = row.querySelector('.unit-qty');
+  brand.onchange = () => { const values = [...new Set(state.products.filter(item => item.brand_id === Number(brand.value)).map(item => item.ac_type))]; type.innerHTML = options(values.map(value => ({ value, label: value })), 'value', 'label', 'Pilih tipe'); type.disabled = !brand.value; pk.disabled = true; product.disabled = true; updateAll(); };
+  type.onchange = () => { const values = [...new Set(state.products.filter(item => item.brand_id === Number(brand.value) && item.ac_type === type.value).map(item => item.pk))].sort((a, b) => a - b); pk.innerHTML = options(values.map(value => ({ value, label: `${value} PK` })), 'value', 'label', 'Pilih PK'); pk.disabled = !type.value; product.disabled = true; updateAll(); };
+  pk.onchange = () => { const list = state.products.filter(item => item.brand_id === Number(brand.value) && item.ac_type === type.value && Number(item.pk) === Number(pk.value)); product.innerHTML = options(list.map(item => ({ value: item.id, label: item.name })), 'value', 'label', 'Pilih model'); product.disabled = !pk.value; updateAll(); };
+  product.onchange = () => { quantity.disabled = !product.value; updateAll(); };
+  quantity.oninput = updateAll;
+  row.querySelector('.remove-unit').onclick = () => { row.remove(); updateAll(); };
+}
+
+function renderPackages() {
+  const list = document.getElementById('packageList');
+  list.innerHTML = state.packages.length ? state.packages.map((item, index) => `<label class="choice-card ${index === 0 ? 'active' : ''}"><input type="radio" name="package_choice" value="${item.id}" data-price="${item.price}" ${index === 0 ? 'checked' : ''}> <strong>${item.name}</strong><span class="choice-price">${money(item.price)}</span><small class="d-block text-muted">${item.description || 'Paket pemasangan dari master'}</small></label>`).join('') : '<div class="text-muted small">Belum ada paket pemasangan aktif.</div>';
+  list.querySelectorAll('input').forEach(input => input.onchange = updateAll);
+  list.querySelectorAll('.choice-card').forEach(card => card.onclick = () => { list.querySelectorAll('.choice-card').forEach(item => item.classList.remove('active')); card.classList.add('active'); });
+}
+
+function renderCatalog() {
+  const selected = new Set(Object.keys(state.extraSelections));
+  const items = state[state.activeKind];
+  const list = document.getElementById('catalogList');
+  list.innerHTML = selectedUnits().length ? (items.map(item => `<label class="catalog-item"><input class="catalog-check" type="checkbox" data-kind="${state.activeKind}" value="${item.id}"><span>${item.name}</span><strong>${money(item.price)}</strong><input class="form-control catalog-qty" type="number" min="1" value="1"></label>`).join('') || '<div class="p-2 text-muted small">Belum ada data master aktif.</div>') : '<div class="p-2 text-muted small">Pilih unit AC dahulu.</div>';
+  document.querySelectorAll('.catalog-check, .catalog-qty').forEach(element => element.onchange = updateAll);
+  document.querySelectorAll('.catalog-check').forEach(input => { if (selected.has(`${input.dataset.kind}:${input.value}`)) input.checked = true; });
+  document.querySelectorAll('.catalog-qty').forEach(input => { const key = `${input.closest('.catalog-item').querySelector('.catalog-check').dataset.kind}:${input.closest('.catalog-item').querySelector('.catalog-check').value}`; if (state.extraSelections[key]) input.value = state.extraSelections[key].qty; });
+}
+
+function updateAll() {
+  const units = selectedUnits();
+  const extras = selectedExtras();
+  extras.forEach(item => { state.extraSelections[`${item.kind}:${item.id}`] = item; });
+  Object.keys(state.extraSelections).forEach(key => { if (!document.querySelector(`.catalog-check[data-kind="${key.split(':')[0]}"][value="${key.split(':')[1]}"]`)) return; if (!document.querySelector(`.catalog-check[data-kind="${key.split(':')[0]}"][value="${key.split(':')[1]}"]:checked`)) delete state.extraSelections[key]; });
+  document.querySelectorAll('input[name="product_selection"]').forEach(input => input.remove());
+  units.forEach(item => { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'product_selection'; input.value = `${item.product.id}:${item.qty}`; document.getElementById('quotationForm').appendChild(input); });
+  const unitTotal = units.reduce((sum, item) => sum + item.product.price * item.qty, 0);
+  const packageInput = document.querySelector('input[name="package_choice"]:checked');
+  const packageTotal = packageInput ? Number(packageInput.dataset.price || 0) * units.reduce((sum, item) => sum + item.qty, 0) : 0;
+  const extraTotal = extras.reduce((sum, item) => sum + (state[item.kind].find(value => value.id === item.id)?.price || 0) * item.qty, 0);
+  const discount = Number(document.getElementById('discount').value || 0);
+  const tax = Number(document.getElementById('tax').value || 0);
+  const beforeTax = Math.max(unitTotal + packageTotal + extraTotal - discount, 0);
+  const grandTotal = beforeTax + beforeTax * tax / 100;
+  document.getElementById('unitTotal').textContent = money(unitTotal);
+  document.getElementById('packageTotal').textContent = money(packageTotal);
+  document.getElementById('extraTotal').textContent = money(extraTotal);
+  document.getElementById('discountTotal').textContent = money(discount);
+  document.getElementById('grandTotal').textContent = money(grandTotal);
+  document.getElementById('unitSummary').innerHTML = units.length ? units.map(item => `<div class="summary-line"><span>${item.qty}x ${item.product.brand_name} ${item.product.name}</span><strong>${money(item.product.price * item.qty)}</strong></div>`).join('') : 'Belum ada unit dipilih.';
+  document.querySelectorAll('.unit-row').forEach(row => { const product = state.products.find(item => item.id === Number(row.querySelector('.unit-product').value)); const quantity = Number(row.querySelector('.unit-qty').value || 1); row.querySelector('.unit-price').textContent = money(product?.price); row.querySelector('.unit-subtotal').textContent = money((product?.price || 0) * quantity); });
+  renderCatalog();
+}
+
+document.getElementById('quotationForm').addEventListener('submit', function () {
+  document.querySelectorAll('input[name="catalog_item"]').forEach(input => input.remove());
+  const packageInput = document.querySelector('input[name="package_choice"]:checked');
+  if (packageInput) { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'catalog_item'; input.value = `packages:${packageInput.value}:${selectedUnits().reduce((sum, item) => sum + item.qty, 0)}`; this.appendChild(input); }
+  Object.values(state.extraSelections).forEach(item => { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'catalog_item'; input.value = `${item.kind}:${item.id}:${item.qty}`; this.appendChild(input); });
+});
+
+document.getElementById('addUnit').onclick = createUnit;
+document.querySelectorAll('.material-tab').forEach(tab => tab.onclick = () => { state.activeKind = tab.dataset.kind; document.querySelectorAll('.material-tab').forEach(item => item.classList.toggle('active', item === tab)); renderCatalog(); });
+document.getElementById('discount').oninput = updateAll;
+document.getElementById('tax').oninput = updateAll;
+
+Promise.all(['products', 'materials', 'services', 'packages'].map(resource => fetch(`/api/master-pricelist/${resource}`).then(response => response.json())))
+  .then(([products, materials, services, packages]) => { state.products = products; state.materials = materials; state.services = services; state.packages = packages; state.brands = [...new Map(products.map(item => [item.brand_id, item.brand_name])).entries()].map(([id, name]) => ({ id, name })); renderPackages(); createUnit(); })
+  .catch(() => { document.getElementById('unitEmpty').textContent = 'Master harga tidak dapat dimuat. Muat ulang halaman.'; });
+</script>
+{% endblock %}

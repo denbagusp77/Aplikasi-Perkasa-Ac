@@ -19,25 +19,42 @@
       </select>
     </div>
 
+    <div class="mb-3">
+      <label class="form-label">Proyek</label>
+      <select name="project_id" class="form-control">
+        <option value="">-- Tanpa Proyek --</option>
+        {% for project in projects %}<option value="{{ project.id }}" {% if project.id == selected_project_id %}selected{% endif %}>{{ project.kode }} - {{ project.nama }}</option>{% endfor %}
+      </select>
+    </div>
+
     <!-- Jenis Transaksi -->
     <div class="mb-3">
       <label class="form-label">Jenis</label>
-      <input
-        type="text"
-        name="jenis"
-        class="form-control"
-        placeholder="Contoh: Cuci AC, Bongkar, Sparepart"
-        required
-      />
+      <div class="input-group">
+        <select name="jenis" class="form-select" id="jenisSelect" required>
+          <option value="">-- Pilih Jenis --</option>
+          <option value="Cuci AC">Cuci AC</option>
+          <option value="Service AC">Service AC</option>
+          <option value="Pasang AC">Pasang AC</option>
+          <option value="Bongkar AC">Bongkar AC</option>
+          <option value="Bongkar Pasang AC">Bongkar Pasang AC</option>
+          <option value="Ganti Sparepart">Ganti Sparepart</option>
+          <option value="Maintenance">Maintenance</option>
+          <option value="Lainnya">Lainnya</option>
+        </select>
+        <button type="button" class="btn btn-outline-secondary" id="btnAddJenis">Tambah</button>
+      </div>
+      <input type="text" id="jenisCustom" class="form-control mt-2 d-none" placeholder="Masukkan jenis baru" />
+      <div class="mt-2 d-flex flex-wrap gap-2" id="jenisExtras"></div>
     </div>
 
     <!-- Teknisi -->
     <div class="mb-3">
       <label class="form-label">Teknisi</label>
-      <select name="technician_id" class="form-control">
+      <select name="technician_id" class="form-control" required>
         <option value="">-- Pilih Teknisi --</option>
         {% for t in teknisi_all %}
-          <option value="{{ t.id }}">{{ t.nama }} ({{ t.team }})</option>
+          <option value="{{ t.id }}">{{ t.nama }} ({{ t.team or '—' }})</option>
         {% endfor %}
       </select>
     </div>
@@ -57,17 +74,107 @@
     <div class="mb-3">
       <label class="form-label">Jumlah (Rp)</label>
       <input
-        type="number"
-        step="0.01"
+        type="text"
         name="jumlah"
+        id="jumlahInput"
         class="form-control"
+        inputmode="numeric"
+        placeholder="Contoh: 1.250.000"
         required
       />
     </div>
 
     <!-- Tombol Aksi -->
     <button type="submit" class="btn btn-success">💾 Simpan</button>
-    <a href="{{ url_for('transactions') }}" class="btn btn-secondary">Batal</a>
+    <a href="{{ url_for('projects', project_id=selected_project_id) if selected_project_id else url_for('transactions') }}" class="btn btn-secondary">Batal</a>
   </form>
 </div>
+
+<script>
+  const jenisSelect = document.getElementById('jenisSelect');
+  const jenisCustom = document.getElementById('jenisCustom');
+  const btnAddJenis = document.getElementById('btnAddJenis');
+  const jenisExtras = document.getElementById('jenisExtras');
+
+  function addJenisOption(value) {
+    const cleanValue = value.trim();
+    if (!cleanValue) return;
+
+    const currentOptions = Array.from(jenisSelect.options).map(opt => opt.value.toLowerCase());
+    if (!currentOptions.includes(cleanValue.toLowerCase())) {
+      const option = new Option(cleanValue, cleanValue);
+      jenisSelect.add(option);
+      jenisSelect.value = cleanValue;
+    } else {
+      jenisSelect.value = cleanValue;
+    }
+
+    jenisCustom.classList.add('d-none');
+    jenisCustom.value = '';
+    updateExtraTags();
+  }
+
+  function updateExtraTags() {
+    const selected = jenisSelect.value;
+    jenisExtras.innerHTML = '';
+    if (!selected || selected === 'Lainnya') return;
+
+    const tag = document.createElement('button');
+    tag.type = 'button';
+    tag.className = 'btn btn-sm btn-light border';
+    tag.textContent = 'Hapus ' + selected;
+    tag.onclick = () => {
+      const optionToRemove = Array.from(jenisSelect.options).find(opt => opt.value === selected);
+      if (optionToRemove && optionToRemove.value !== 'Cuci AC' && optionToRemove.value !== 'Service AC' && optionToRemove.value !== 'Pasang AC' && optionToRemove.value !== 'Bongkar AC' && optionToRemove.value !== 'Bongkar Pasang AC' && optionToRemove.value !== 'Ganti Sparepart' && optionToRemove.value !== 'Maintenance' && optionToRemove.value !== 'Lainnya') {
+        jenisSelect.remove(optionToRemove.index);
+        if (jenisSelect.options.length > 0) {
+          jenisSelect.selectedIndex = 0;
+        }
+      }
+      updateExtraTags();
+    };
+    jenisExtras.appendChild(tag);
+  }
+
+  btnAddJenis.addEventListener('click', () => {
+    if (jenisCustom.classList.contains('d-none')) {
+      jenisCustom.classList.remove('d-none');
+      jenisCustom.focus();
+      return;
+    }
+
+    addJenisOption(jenisCustom.value);
+  });
+
+  jenisSelect.addEventListener('change', () => {
+    if (jenisSelect.value === 'Lainnya') {
+      jenisCustom.classList.remove('d-none');
+      jenisCustom.focus();
+    } else {
+      jenisCustom.classList.add('d-none');
+      jenisCustom.value = '';
+    }
+    updateExtraTags();
+  });
+
+  jenisCustom.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addJenisOption(jenisCustom.value);
+    }
+  });
+
+  const jumlahInput = document.getElementById('jumlahInput');
+
+  jumlahInput.addEventListener('input', () => {
+    const digits = jumlahInput.value.replace(/\D/g, '');
+    jumlahInput.value = digits ? Number(digits).toLocaleString('id-ID') : '';
+  });
+
+  document.querySelector('form').addEventListener('submit', () => {
+    jumlahInput.value = jumlahInput.value.replace(/\./g, '') || '0';
+  });
+
+  updateExtraTags();
+</script>
 {% endblock %}

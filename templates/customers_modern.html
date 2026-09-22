@@ -13,10 +13,10 @@
 </div>
 
 <!-- 🔍 Search & Filter -->
-<form class="row g-2 mb-3" method="get">
+<form id="customer-filter-form" class="row g-2 mb-3" method="get">
   <div class="col-md-3">
     <input type="text" class="form-control" placeholder="Cari nama atau No WA..." 
-           name="q" value="{{ q }}">
+           name="q" value="{{ q }}" autocomplete="off" aria-label="Cari customer">
   </div>
   <div class="col-md-2">
     <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
@@ -35,6 +35,19 @@
     <button class="btn btn-outline-secondary"><i class="bi bi-funnel"></i> Filter</button>
   </div>
 </form>
+
+<script>
+  const customerSearch = document.querySelector('#customer-filter-form input[name="q"]');
+  const customerFilterForm = document.getElementById('customer-filter-form');
+  let customerSearchTimer;
+
+  if (customerSearch && customerFilterForm) {
+    customerSearch.addEventListener('input', () => {
+      clearTimeout(customerSearchTimer);
+      customerSearchTimer = setTimeout(() => customerFilterForm.requestSubmit(), 350);
+    });
+  }
+</script>
 
 <!-- 📋 Table -->
 <table class="table table-hover bg-white rounded shadow-sm">

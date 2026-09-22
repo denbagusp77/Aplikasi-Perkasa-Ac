@@ -1,0 +1,442 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<style>
+  .doc-page {
+    margin-top: 70px;
+    margin-left: 68px;
+    padding: 28px 18px 40px;
+    max-width: 1400px;
+  }
+  .doc-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .doc-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1f2d3d;
+    margin: 0;
+  }
+  .doc-subtitle {
+    color: #7a8699;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+  .btn-back {
+    background: #fff;
+    border: 1px solid #dfe6ef;
+    color: #20304a;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .doc-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(285px, 0.8fr);
+    gap: 22px;
+    align-items: start;
+  }
+  .panel-card {
+    background: #ffffff;
+    border: 1px solid #e7edf4;
+    border-radius: 18px;
+    box-shadow: 0 8px 22px rgba(17, 24, 39, 0.04);
+  }
+  .form-panel {
+    padding: 22px 22px 18px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #1f2d3d;
+    margin-bottom: 18px;
+  }
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 14px;
+  }
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .input-group label {
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: #2d3a4b;
+  }
+  .input-group label .required {
+    color: #d73232;
+  }
+  .input-group input,
+  .input-group select,
+  .input-group textarea {
+    background: #fff;
+    border: 1px solid #d9e2ee;
+    border-radius: 10px;
+    padding: 11px 12px;
+    font-size: 0.98rem;
+    color: #1f2d3d;
+    width: 100%;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .input-group input:focus,
+  .input-group select:focus,
+  .input-group textarea:focus {
+    outline: none;
+    border-color: #2f7ef6;
+    box-shadow: 0 0 0 3px rgba(47, 126, 246, 0.12);
+  }
+  .input-group textarea {
+    min-height: 110px;
+    resize: vertical;
+  }
+  .upload-box {
+    margin-top: 22px;
+    border: 2px dashed #cfe0f7;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #f8fbff 0%, #f6f9fd 100%);
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 26px 18px;
+    color: #7b8798;
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-box i {
+    font-size: 2.6rem;
+    color: #2b73dd;
+    margin-bottom: 10px;
+  }
+  .upload-box strong {
+    display: block;
+    font-size: 1.1rem;
+    color: #2d3a4b;
+    margin-bottom: 6px;
+  }
+  .upload-box button {
+    margin-top: 10px;
+    background: #1d6fe7;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+  }
+  .upload-box small {
+    display: block;
+    margin-top: 10px;
+    color: #8b95a7;
+    line-height: 1.6;
+  }
+  .upload-file-card {
+    margin-top: 18px;
+    background: #f8fafc;
+    border: 1px solid #e3ecf6;
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .file-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #2f3d4f;
+    font-weight: 600
+  }
+  .file-name .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #e6f0ff;
+    color: #1d6fe7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .file-meta {
+    color: #7b8798;
+    font-size: 0.8rem;
+  }
+  .form-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .btn-secondary-light {
+    background: #fff;
+    border: 1px solid #dfe6ef;
+    color: #1b2a3d;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+  }
+  .btn-primary-action {
+    background: linear-gradient(180deg, #2b7ef6 0%, #1d67d6 100%);
+    border: none;
+    color: #fff;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-weight: 800;
+    box-shadow: 0 10px 16px rgba(29, 103, 214, 0.18);
+  }
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .info-card {
+    padding: 18px 18px 14px;
+  }
+  .info-card h5 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.08rem;
+    font-weight: 800;
+    margin: 0 0 18px;
+    color: #20304a;
+  }
+  .info-grid {
+    display: grid;
+    gap: 14px;
+  }
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .info-item label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: #728096;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+  .info-item select,
+  .info-item input {
+    width: 100%;
+    border: 1px solid #dfe6ef;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    color: #1f2d3d;
+  }
+  .check-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff8e8;
+    border: 1px solid #f0d18f;
+    border-radius: 10px;
+    padding: 12px 10px;
+    margin-top: 8px;
+  }
+  .check-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: #f4b227;
+  }
+  .tag-box {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tag-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+  }
+  .tag-pill.blue { background: #edf5ff; color: #1d6fe7; border-color: #d7e8ff; }
+  .tag-pill.green { background: #eafaf1; color: #1ea869; border-color: #cceed8; }
+  .tag-pill.purple { background: #f2ecff; color: #5d44c8; border-color: #dfd4ff; }
+  .tips-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    color: #3c536c;
+    font-size: 0.96rem;
+  }
+  .tips-list li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .tips-list li::before {
+    content: '✓';
+    color: #1ea869;
+    font-weight: 800;
+    margin-top: 1px;
+  }
+  @media (max-width: 980px) {
+    .doc-page { margin-left: 0; }
+    .doc-shell { grid-template-columns: 1fr; }
+    .field-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="doc-page">
+  <div class="doc-topbar">
+    <div>
+      <p class="doc-subtitle">Dokumen &amp; Riwayat / Dokumen Baru</p>
+      <h1 class="doc-title">Dokumen Baru</h1>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-back">Kembali</a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+    <div class="doc-shell">
+      <div class="panel-card form-panel">
+        <div class="section-header"><i class="bi bi-file-earmark-text"></i> Informasi Dokumen</div>
+
+        <div class="field-grid">
+          <div class="input-group">
+            <label>Nama Dokumen <span class="required">*</span></label>
+            <input type="text" name="nama_dokumen" placeholder="Laporan Hasil Service AC" required>
+          </div>
+
+          <div class="input-group">
+            <label>Jenis Dokumen <span class="required">*</span></label>
+            <select name="jenis_dokumen" required>
+              {% for type in document_types %}
+              <option value="{{ type }}">{{ type }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Nomor Dokumen</label>
+            <input type="text" name="nomor_dokumen" placeholder="LP-2026-009">
+          </div>
+
+          <div class="input-group">
+            <label>Terkait Dengan</label>
+            <select name="terkait_dengan">
+              {% for item in related_options %}
+              <option value="{{ item }}">{{ item }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Tanggal Dokumen</label>
+            <input type="date" name="tanggal_dokumen" value="{{ today_date }}">
+          </div>
+
+          <div class="input-group">
+            <label>Periode</label>
+            <input type="text" name="periode" placeholder="September 2026">
+          </div>
+        </div>
+
+        <div class="input-group" style="margin-top: 18px;">
+          <label>Deskripsi / Keterangan</label>
+          <textarea name="deskripsi" placeholder="Laporan hasil pekerjaan service AC rutin di gedung ABC."></textarea>
+        </div>
+
+        <div class="section-header" style="margin-top: 28px; margin-bottom: 14px;"><i class="bi bi-cloud-arrow-up"></i> File Dokumen</div>
+
+        <div class="upload-box">
+          <i class="bi bi-cloud-upload"></i>
+          <strong>Drag &amp; drop file di sini</strong>
+          <button type="button">Pilih File</button>
+          <small>Format: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, ZIP<br>Ukuran maksimal: 10 MB</small>
+        </div>
+
+        <div class="upload-file-card" hidden>
+          <div class="file-name">
+            <span class="icon"><i class="bi bi-file-earmark-pdf"></i></span>
+            <span>File.pdf</span>
+          </div>
+          <div class="file-meta">245 KB</div>
+        </div>
+
+        <input type="file" name="file" class="form-control mt-3" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.zip" required>
+
+        <div class="form-actions">
+          <button type="reset" class="btn-secondary-light">Batal</button>
+          <button type="submit" class="btn-primary-action">Simpan Dokumen</button>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <div class="panel-card info-card">
+          <h5><i class="bi bi-info-circle"></i> Informasi Tambahan</h5>
+
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Status</label>
+              <select name="status">
+                <option value="Final" selected>Final</option>
+                <option value="Draft">Draft</option>
+                <option value="Review">Review</option>
+              </select>
+            </div>
+
+            <div class="info-item">
+              <label>Diubah Oleh</label>
+              <input type="text" name="dibuat_oleh" value="{{ current_user.username }}" readonly>
+            </div>
+
+            <div class="info-item">
+              <label>akses</label>
+              <select name="akses">
+                <option value="Internal" selected>Internal</option>
+                <option value="Eksternal">Eksternal</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="check-toggle">
+            <input type="checkbox" id="urgentDoc" name="penting" value="1">
+            <label for="urgentDoc">Tandai sebagai dokumen penting</label>
+          </div>
+        </div>
+
+        <div class="panel-card info-card">
+          <h5><i class="bi bi-tag"></i> Tag / Label</h5>
+          <input type="text" name="tag" placeholder="Tambah tag (tekan Enter)" style="width:100%; border:1px solid #dfe6ef; border-radius:10px; padding:10px 12px; background:#f8fafc;">
+          <div class="tag-box">
+            <span class="tag-pill blue">Service</span>
+            <span class="tag-pill green">Laporan</span>
+            <span class="tag-pill purple">ABC Facility</span>
+          </div>
+        </div>
+
+        <div class="panel-card info-card">
+          <h5><i class="bi bi-lightbulb"></i> Tips</h5>
+          <ul class="tips-list">
+            <li>Gunakan nama dokumen yang jelas dan mudah dicari.</li>
+            <li>Pilih kategori dan tanggal dengan benar agar riwayat teratur.</li>
+            <li>Format file yang valid agar bisa dibuka di semua perangkat.</li>
+            <li>Dokumen penting sebaiknya diberi label khusus agar mudah ditemukan.</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </form>
+</div>
+{% endblock %}

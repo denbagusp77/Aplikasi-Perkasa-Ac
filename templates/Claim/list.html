@@ -1,70 +1,135 @@
 {% extends "base_modern.html" %}
 {% block content %}
+<style>
+  .page-shell {
+    background: #f5f7fb;
+    border: 1px solid #e2e8f0;
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  }
+  .page-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .tab-pill {
+    border: 1px solid #dfe7f1;
+    border-radius: 999px;
+    padding: 8px 16px;
+    background: #ffffff;
+    color: #475569;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+  .tab-pill.active {
+    background: #0f172a;
+    color: #fff;
+    border-color: #0f172a;
+  }
+  .list-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .list-row {
+    display: grid;
+    grid-template-columns: 0.5fr 1.2fr 1fr 1fr 1.5fr 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #edf2f7;
+  }
+  .list-row:last-child {
+    border-bottom: none;
+  }
+  .list-header {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    font-weight: 800;
+    background: #f8fafc;
+  }
+  .badge-soft {
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+  .badge-soft.warning { background: #fff3cd; color: #7a5200; }
+  .badge-soft.success { background: #dcfce7; color: #166534; }
+  .badge-soft.secondary { background: #e2e8f0; color: #334155; }
+  @media (max-width: 900px) {
+    .list-row {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+<div class="page-shell">
+  <div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
+    <h3 class="fw-bold text-primary">
+      <i class="bi bi-flag-fill me-2"></i> Klaim Customer
+    </h3>
+    <div class="page-tabs" role="group" aria-label="Navigation tab claim">
+      <a href="{{ url_for('reminders_auto', tab='reminder') }}" class="tab-pill {% if active_tab == 'reminder' %}active{% endif %}">Reminder</a>
+      <a href="{{ url_for('unpaid_list', tab='unpaid') }}" class="tab-pill {% if active_tab == 'unpaid' %}active{% endif %}">Belum Lunas</a>
+      <a href="{{ url_for('claim_list_all', tab='claim') }}" class="tab-pill {% if active_tab == 'claim' %}active{% endif %}">Klaim</a>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary rounded-pill">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+  </div>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h3 class="fw-bold text-primary">
-    <i class="bi bi-flag-fill me-2"></i> Klaim Customer
-  </h3>
-  <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary rounded-pill">
-    <i class="bi bi-arrow-left"></i> Kembali
-  </a>
-</div>
-
-<div class="card-glass rounded-4 p-3 shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>#</th>
-          <th>Customer</th>
-          <th>Teknisi</th>
-          <th>Tanggal</th>
-          <th>Deskripsi</th>
-          <th>Status</th>
-          <th>Aksi</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if claims %}
-          {% for claim in claims %}
-          <tr>
-            <td>{{ loop.index }}</td>
-            <td>{{ claim.customer.nama if claim.customer else "-" }}</td>
-
-            <!-- ✅ Teknisi dari Service lebih prioritas -->
-            
-              <td>{{ claim.teknisi_display }}</td>
-
-
-
-            <td>{{ claim.tanggal.strftime("%d-%m-%Y") }}</td>
-            <td>{{ claim.deskripsi or '-' }}</td>
-            <td>
-              {% if claim.status|lower == "pending" %}
-                <span class="badge bg-warning text-dark">Pending</span>
-              {% elif claim.status|lower in ["selesai","done"] %}
-                <span class="badge bg-success">Selesai</span>
-              {% else %}
-                <span class="badge bg-secondary">{{ claim.status }}</span>
-              {% endif %}
-            </td>
-            <td>
-              <a href="{{ url_for('claim_edit', claim_id=claim.id) }}" 
-                 class="btn btn-sm btn-outline-secondary rounded-pill">
-                Edit
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="7" class="text-center text-muted fst-italic">
-              Belum ada klaim tercatat
-            </td>
-          </tr>
-        {% endif %}
-      </tbody>
-    </table>
+<div class="list-card">
+    <div class="list-row list-header">
+      <div>#</div>
+      <div>Customer</div>
+      <div>Teknisi</div>
+      <div>Tanggal</div>
+      <div>Deskripsi</div>
+      <div>Status</div>
+      <div class="text-center">Aksi</div>
+    </div>
+    {% if claims %}
+      {% for claim in claims %}
+      <div class="list-row">
+        <div>{{ loop.index }}</div>
+        <div>{{ claim.customer.nama if claim.customer else "-" }}</div>
+        <div>{{ claim.teknisi_display }}</div>
+        <div>{{ claim.tanggal.strftime("%d-%m-%Y") }}</div>
+        <div>{{ claim.deskripsi or '-' }}</div>
+        <div>
+          {% if claim.status|lower == "pending" %}
+            <span class="badge-soft warning">Pending</span>
+          {% elif claim.status|lower in ["selesai","done"] %}
+            <span class="badge-soft success">Selesai</span>
+          {% else %}
+            <span class="badge-soft secondary">{{ claim.status }}</span>
+          {% endif %}
+        </div>
+        <div class="text-center">
+          <a href="{{ url_for('claim_edit', claim_id=claim.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill">
+            Edit
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="list-row">
+        <div class="text-muted fst-italic">Belum ada klaim tercatat</div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+    {% endif %}
   </div>
 </div>
 
