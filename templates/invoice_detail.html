@@ -29,10 +29,10 @@
   <!-- HEADER -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex align-items-center">
-      <img src="{{ url_for('static', filename='logo.png') }}" width="50" class="me-3">
+      <img src="{{ url_for('static', filename=company_profile.logo) }}" width="50" class="me-3">
       <div>
         <h4 class="mb-0 fw-bold">Invoice #{{ invoice.id }}</h4>
-        <small class="text-muted">Perkasa AC Service Management</small>
+        <small class="text-muted">{{ company_profile.name }} Service Management</small>
       </div>
     </div>
 

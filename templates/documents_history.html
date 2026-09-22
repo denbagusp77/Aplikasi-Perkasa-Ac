@@ -1,0 +1,46 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="doc-page">
+  <div class="doc-topbar">
+    <div>
+      <p class="doc-subtitle">Dokumen &amp; Riwayat</p>
+      <h1 class="doc-title">Riwayat Dokumen</h1>
+    </div>
+    <a href="{{ url_for('documents') }}" class="btn btn-back">Kembali</a>
+  </div>
+
+  <div class="panel-card form-panel">
+    <div class="section-header"><i class="bi bi-clock-history"></i> Semua Dokumen</div>
+    {% if documents %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th>Jenis</th>
+            <th>Nomor</th>
+            <th>Tanggal</th>
+            <th>Status</th>
+            <th>Unduh</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+          <tr>
+            <td>{{ doc.nama }}</td>
+            <td>{{ doc.jenis }}</td>
+            <td>{{ doc.nomor or '-' }}</td>
+            <td>{{ doc.tanggal.strftime('%d-%m-%Y') }}</td>
+            <td><span class="badge bg-success-subtle text-success">{{ doc.status }}</span></td>
+            <td><a href="{{ url_for('document_download', doc_id=doc.id) }}" class="btn btn-sm btn-primary">Download</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">Belum ada riwayat dokumen.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

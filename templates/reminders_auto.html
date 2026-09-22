@@ -1,22 +1,125 @@
 {% extends 'base_modern.html' %}
 {% block content %}
-<div class="card shadow p-4">
-  <h4 class="mb-3">📅 Reminder Otomatis - Service Cuci</h4>
-  <p class="text-muted">
-    Menampilkan daftar customer yang perlu diingatkan dari H-14 hingga H-1 sebelum jadwal cuci AC berikutnya.
-  </p>
+<style>
+  .reminder-page {
+    background: #f8fafc;
+    border: 1px solid #dce4ee;
+    border-radius: 6px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .08);
+  }
+  .reminder-heading {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+  }
+  .reminder-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .reminder-tabs a {
+    border: 1px solid #d8e1eb;
+    border-radius: 5px;
+    padding: 6px 12px;
+    background: #fff;
+    color: #24405f;
+    font-size: .78rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .reminder-tabs a.active {
+    background: #111827;
+    border-color: #111827;
+    color: #fff;
+  }
+  .reminder-table-wrap {
+    overflow-x: auto;
+    background: #fff;
+    border: 1px solid #dce3eb;
+    border-radius: 4px;
+  }
+  .reminder-table {
+    width: 100%;
+    min-width: 940px;
+    margin: 0;
+    border-collapse: collapse;
+    font-size: .76rem;
+    color: #243447;
+  }
+  .reminder-table th {
+    background: #f1f5f9;
+    color: #1f2937;
+    font-size: .68rem;
+    text-transform: none;
+    white-space: nowrap;
+    padding: 9px 7px;
+    border-bottom: 1px solid #dce3eb;
+  }
+  .reminder-table td {
+    padding: 7px;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: middle;
+  }
+  .reminder-table tr:last-child td { border-bottom: 0; }
+  .customer-name { font-weight: 700; color: #172033; }
+  .customer-address { display: block; max-width: 190px; line-height: 1.35; }
+  .wa-link { color: #438d82; white-space: nowrap; }
+  .unit-text { white-space: nowrap; }
+  .date-badge, .status-badge, .sent-badge {
+    display: inline-block;
+    border-radius: 3px;
+    padding: 4px 7px;
+    font-size: .67rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .date-badge { background: #11b9df; color: #083344; }
+  .status-badge { background: #dc3545; color: #fff; }
+  .status-badge.today { background: #f59e0b; color: #422006; }
+  .status-badge.late { background: #6b7280; color: #fff; }
+  .sent-badge { background: #198754; color: #fff; }
+  .team-badge {
+    display: inline-block;
+    min-width: 39px;
+    border-radius: 3px;
+    padding: 3px 5px;
+    background: #0d6efd;
+    color: #fff;
+    font-size: .63rem;
+    font-weight: 700;
+    text-align: center;
+  }
+  .team-badge.external { background: #6c757d; }
+  .action-stack { display: grid; gap: 4px; min-width: 58px; }
+  .action-stack .btn { padding: 3px 6px; font-size: .67rem; white-space: nowrap; }
+  .empty-row { padding: 22px !important; color: #6b7280; font-style: italic; }
+</style>
 
-  <div class="table-responsive">
-    <table class="table table-hover align-middle">
-      <thead class="table-light">
+<div class="reminder-page">
+  <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-2">
+    <h1 class="reminder-heading"><i class="bi bi-calendar3"></i> Reminder Otomatis - Service Cuci</h1>
+    <div class="reminder-tabs" role="group" aria-label="Navigation reminder">
+      <a href="{{ url_for('reminders_auto', tab='reminder') }}" class="{% if active_tab == 'reminder' %}active{% endif %}">Reminder</a>
+      <a href="{{ url_for('unpaid_list', tab='unpaid') }}" class="{% if active_tab == 'unpaid' %}active{% endif %}">Belum Lunas</a>
+      <a href="{{ url_for('claim_list_all', tab='claim') }}" class="{% if active_tab == 'claim' %}active{% endif %}">Klaim</a>
+    </div>
+  </div>
+
+  <p class="small text-muted mb-3">Menampilkan jadwal cuci H-14 hingga H-1 serta jadwal yang sudah lewat dan belum melakukan cuci kembali.</p>
+
+  <div class="reminder-table-wrap">
+    <table class="reminder-table">
+      <thead>
         <tr>
           <th>Customer</th>
           <th>No WA</th>
           <th>Alamat</th>
           <th>Team</th>
           <th>Unit</th>
-          <th>Tgl Cuci Berikutnya</th>
-          <th>Status Reminder</th>
+          <th>Tgl Cuci<br>Berikutnya</th>
+          <th>Status<br>Reminder</th>
           <th>Keterangan</th>
           <th class="text-center">Aksi</th>
         </tr>
@@ -24,102 +127,79 @@
       <tbody>
         {% for r in reminders %}
         <tr>
-          <td><strong>{{ r.nama }}</strong></td>
+          <td><span class="customer-name">{{ r.nama }}</span></td>
           <td>
-            <a href="https://web.whatsapp.com/send?phone={{ r.wa }}" target="_blank" class="text-success">
-              <i class="bi bi-whatsapp"></i> {{ r.wa }}
+            <a class="wa-link" href="https://web.whatsapp.com/send?phone={{ r.wa }}" target="_blank" rel="noopener">
+              <i class="bi bi-whatsapp"></i> {{ r.wa or '-' }}
             </a>
           </td>
-          <td>{{ r.alamat }}</td>
+          <td><span class="customer-address">{{ r.alamat or '-' }}</span></td>
           <td>
-            <span class="badge {% if r.team == 'Internal' %}bg-primary{% else %}bg-secondary{% endif %}">
-              {{ r.team }}
-            </span>
+            <span class="team-badge {% if r.team != 'Internal' %}external{% endif %}">{{ r.team or '-' }}</span>
           </td>
-          <td>{{ r.unit }}</td>
+          <td><span class="unit-text">{{ r.unit }}</span></td>
+          <td><span class="date-badge">{{ r.tanggal.strftime('%d/%m/%Y') }}</span></td>
           <td>
-            <span class="badge bg-info text-dark">{{ r.tanggal.strftime('%d/%m/%Y') }}</span>
-          </td>
-          <td>
-            {% set h_value = r.tipe.split('-')[1]|int %}
-            {% if h_value == 1 %}
-              <span class="badge bg-danger">H-1</span>
-            {% elif h_value == 7 %}
-              <span class="badge bg-warning text-dark">H-7</span>
-            {% elif h_value <= 3 %}
-              <span class="badge bg-danger-subtle text-dark">{{ r.tipe }}</span>
-            {% elif h_value <= 10 %}
-              <span class="badge bg-info text-dark">{{ r.tipe }}</span>
+            {% if r.tipe == 'Hari Ini' %}
+              <span class="status-badge today">Hari Ini</span>
+            {% elif r.tipe.startswith('Lewat') %}
+              <span class="status-badge late">{{ r.tipe }}</span>
             {% else %}
-              <span class="badge bg-secondary">{{ r.tipe }}</span>
+              <span class="status-badge">{{ r.tipe }}</span>
             {% endif %}
           </td>
           <td>
-            {% if r.keterangan == 'Sudah di-Reminder' %}
-              <span class="badge bg-success">
-                <i class="bi bi-check-circle-fill"></i> {{ r.keterangan }}
-              </span>
-            {% elif r.keterangan == 'Belum di-Reminder' %}
-              <span class="badge bg-danger">
-                <i class="bi bi-x-circle-fill"></i> {{ r.keterangan }}
-              </span>
+            {% if r.reminder_sent %}
+              <span class="sent-badge"><i class="bi bi-check2"></i> {{ r.keterangan }}</span>
             {% else %}
-              <span class="badge bg-secondary">{{ r.keterangan }}</span>
+              <span class="text-muted">Belum di-Reminder</span>
             {% endif %}
           </td>
-          <td class="text-center">
-            <a href="{{ url_for('service_edit', id=r.id) }}" 
-              class="btn btn-sm btn-outline-warning me-1">
-              <i class="bi bi-pencil-square"></i> Edit
-            </a>
-
-            {% if r.keterangan == 'Sudah di-Reminder' %}
-              <button class="btn btn-sm btn-success" onclick="kirimReminder({{ r.id }})">
-                <i class="bi bi-check-lg"></i> Sudah Dikirim
-              </button>
-            {% else %}
-              <button class="btn btn-sm btn-danger" onclick="kirimReminder({{ r.id }})">
-                <i class="bi bi-send"></i> Kirim Reminder
-              </button>
-            {% endif %}
+          <td>
+            <div class="action-stack">
+              <a class="btn btn-sm btn-outline-warning" href="{{ url_for('service_edit', id=r.id) }}">
+                <i class="bi bi-pencil-square"></i> Edit
+              </a>
+              {% if r.send_count >= 3 %}
+                <button class="btn btn-sm btn-danger" type="button" disabled>
+                  <i class="bi bi-check2"></i> Maksimal 3/3
+                </button>
+              {% elif r.send_count > 0 %}
+                <button class="btn btn-sm btn-success" type="button" onclick="kirimReminder({{ r.id }})">
+                  <i class="bi bi-arrow-repeat"></i> Ingatkan Lagi ({{ r.send_count }}/3)
+                </button>
+              {% else %}
+                <button class="btn btn-sm btn-success" type="button" onclick="kirimReminder({{ r.id }})">
+                  <i class="bi bi-send"></i> Kirim
+                </button>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% else %}
-        <tr>
-          <td colspan="9" class="text-center text-muted">
-            Tidak ada reminder untuk periode H-14 hingga H-1 🙌
-          </td>
-        </tr>
+        <tr><td colspan="9" class="empty-row">Tidak ada jadwal reminder atau jadwal cuci yang terlewat.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- ✅ Script JS: selalu pakai tab WhatsApp yang sama -->
 <script>
   function kirimReminder(id) {
     fetch('/reminder/send/' + id, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     })
-    .then(res => res.json())
-    .then(data => {
-      if (!data.success) {
-        alert('Gagal: ' + (data.message || 'Tidak diketahui'));
-        return;
-      }
-
-      // 🟢 Buka WhatsApp di tab bernama "waTab"
-      window.open(data.wa_url, 'waTab');
-
-      // 🟢 Refresh status reminder setelah delay
-      setTimeout(() => location.reload(), 1500);
-    })
-    .catch(err => {
-      console.error('Error:', err);
-      alert('Terjadi kesalahan saat mengirim reminder.');
-    });
+      .then(response => response.json())
+      .then(data => {
+        if (!data.success) {
+          alert(data.message || 'Gagal mengirim reminder.');
+          return;
+        }
+        window.open(data.wa_url, 'waTab');
+        setTimeout(() => location.reload(), 800);
+      })
+      .catch(() => alert('Terjadi kesalahan saat mengirim reminder.'));
   }
 </script>
 {% endblock %}

@@ -1,52 +1,41 @@
-# import click
-# from flask.cli import with_appcontext
 from flask import (
     Flask, render_template, redirect, url_for, request, flash,
-    send_from_directory, make_response, Response,Blueprint
+    send_from_directory, make_response, Response, jsonify, send_file
 )
-from sqlalchemy import event  # ⬅️ tambahkan ini di atas
-import pdfkit
-import re
-from flask import make_response
-from werkzeug.utils import secure_filename
-import qrcode
-from reportlab.lib.utils import ImageReader
-from collections import defaultdict
-from calendar import monthrange
-from datetime import date, timedelta
-
-
-from sqlalchemy import text 
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager, login_user, login_required,
     logout_user, current_user, UserMixin
 )
 from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import or_, func, extract
-from sqlalchemy.orm import aliased
-from datetime import date, datetime,timedelta
-from dateutil.relativedelta import relativedelta
-import os, io, json, requests
-from urllib.parse import quote
-from flask import jsonify
+from werkzeug.utils import secure_filename
+from sqlalchemy import event, text, or_, func, extract
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import aliased, joinedload
 from sqlalchemy.ext.hybrid import hybrid_property
-from flask import send_file
+from dateutil.relativedelta import relativedelta
+from collections import defaultdict
+from calendar import monthrange
+from datetime import date, datetime, timedelta
+from urllib.parse import quote
+import io
+import json
+import os
+import re
 import requests
-from sqlalchemy import or_
-
-
+import pdfkit
 
 # Excel & PDF
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from reportlab.platypus import (
     SimpleDocTemplate, Table, TableStyle,
     Paragraph, Spacer, Image
 )
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
 
 
 # =========================
@@ -56,6 +45,40 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'ac-service-secret'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ac_service.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+COMPANY_PROFILES = {
+    'perkasa': {
+        'name': 'PERKASA AC',
+        'tagline': 'HVAC Sales, Installation & Service',
+        'address': 'Jl. Sukabangun 2, KM 6,5\nPalembang, Indonesia',
+        'logo': 'logo.png',
+    },
+    'andi_jaya': {
+        'name': 'CV ANDI JAYA',
+        'tagline': 'HVAC Sales, Installation & Service',
+        'address': 'Jl. Sukabangun 2, KM 6,5\nPalembang, Indonesia',
+        'logo': 'logo.png',
+    },
+}
+
+
+def get_company_profile(company_key=None):
+    key = (company_key or 'perkasa').strip().lower()
+    profile = COMPANY_PROFILES.get(key, COMPANY_PROFILES['perkasa'])
+    return {
+        'name': profile['name'],
+        'tagline': profile['tagline'],
+        'address': profile['address'],
+        'logo': profile['logo'],
+        'short_name': profile['name'],
+    }
+
+
+@app.context_processor
+def inject_company_profile():
+    company_key = request.args.get('company', 'perkasa')
+    return {'company_profile': get_company_profile(company_key)}
+
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -141,6 +164,285 @@ class Package(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nama = db.Column(db.String(200), nullable=False)
     harga = db.Column(db.Float, default=0.0)
+
+
+class UploadedDocument(db.Model):
+    __tablename__ = 'uploaded_document'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nama = db.Column(db.String(200), nullable=False)
+    nomor = db.Column(db.String(100))
+    jenis = db.Column(db.String(100), nullable=False, default='Laporan')
+    terkait_dengan = db.Column(db.String(200))
+    tanggal = db.Column(db.Date, nullable=False, default=date.today)
+    periode = db.Column(db.String(100))
+    deskripsi = db.Column(db.Text)
+    status = db.Column(db.String(50), nullable=False, default='Final')
+    dibuat_oleh = db.Column(db.String(100), default='admin')
+    akses = db.Column(db.String(50), nullable=False, default='Internal')
+    penting = db.Column(db.Boolean, default=False)
+    tag = db.Column(db.String(200))
+    file_name = db.Column(db.String(255), nullable=False)
+    original_name = db.Column(db.String(255), nullable=False)
+    mime_type = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+# Master Pricelist AC
+class ACBrand(db.Model):
+    __tablename__ = 'ac_brand'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nama = db.Column(db.String(100), unique=True, nullable=False)
+    logo = db.Column(db.String(255))
+    negara_asal = db.Column(db.String(100))
+    website = db.Column(db.String(255))
+    garansi = db.Column(db.String(255))
+    status = db.Column(db.String(20), nullable=False, default='Aktif')
+    products = db.relationship('ACProduct', back_populates='brand', lazy=True)
+
+
+class ACProduct(db.Model):
+    __tablename__ = 'ac_product'
+
+    id = db.Column(db.Integer, primary_key=True)
+    brand_id = db.Column(db.Integer, db.ForeignKey('ac_brand.id'), nullable=False)
+    seri = db.Column(db.String(100))
+    model = db.Column(db.String(150), unique=True, nullable=False)
+    pk = db.Column(db.Float)
+    jenis = db.Column(db.String(50), nullable=False, default='Standard')
+    refrigerant = db.Column(db.String(50))
+    tegangan_nominal = db.Column(db.String(50))
+    frekuensi_hz = db.Column(db.Float)
+    kapasitas_btu = db.Column(db.Float)
+    daya_watt = db.Column(db.Float)
+    arus_ampere = db.Column(db.Float)
+    eer = db.Column(db.Float)
+    cop = db.Column(db.Float)
+    pipa_liquid = db.Column(db.String(30))
+    pipa_gas = db.Column(db.String(30))
+    panjang_pipa_maksimum = db.Column(db.Float)
+    beda_tinggi_maksimum = db.Column(db.Float)
+    berat_indoor = db.Column(db.Float)
+    berat_outdoor = db.Column(db.Float)
+    dimensi_indoor = db.Column(db.String(100))
+    dimensi_outdoor = db.Column(db.String(100))
+    warna = db.Column(db.String(50))
+    made_in = db.Column(db.String(100))
+    garansi_kompresor = db.Column(db.String(100))
+    garansi_sparepart = db.Column(db.String(100))
+    harga_modal = db.Column(db.Float, nullable=False, default=0.0)
+    harga_distributor = db.Column(db.Float, nullable=False, default=0.0)
+    harga_dealer = db.Column(db.Float, nullable=False, default=0.0)
+    harga_jual = db.Column(db.Float, nullable=False, default=0.0)
+    status = db.Column(db.String(20), nullable=False, default='Aktif')
+    brosur_pdf = db.Column(db.String(255))
+    manual_book = db.Column(db.String(255))
+    foto_indoor = db.Column(db.String(255))
+    foto_outdoor = db.Column(db.String(255))
+    foto_produk = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    brand = db.relationship('ACBrand', back_populates='products')
+
+    @property
+    def margin_persen(self):
+        if not self.harga_jual:
+            return 0.0
+        return round(((self.harga_jual - self.harga_modal) / self.harga_jual) * 100, 2)
+
+
+class CatalogService(db.Model):
+    __tablename__ = 'catalog_service'
+
+    id = db.Column(db.Integer, primary_key=True)
+    kode = db.Column(db.String(50), unique=True, nullable=False)
+    nama = db.Column(db.String(150), nullable=False)
+    harga_modal = db.Column(db.Float, nullable=False, default=0.0)
+    harga_jual = db.Column(db.Float, nullable=False, default=0.0)
+    komisi_teknisi = db.Column(db.Float, nullable=False, default=0.0)
+    estimasi_waktu_menit = db.Column(db.Integer)
+    garansi = db.Column(db.String(100))
+    status = db.Column(db.String(20), nullable=False, default='Aktif')
+
+    @property
+    def margin_persen(self):
+        if not self.harga_jual:
+            return 0.0
+        return round(((self.harga_jual - self.harga_modal) / self.harga_jual) * 100, 2)
+
+
+class Material(db.Model):
+    __tablename__ = 'material'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nama = db.Column(db.String(150), nullable=False)
+    kategori = db.Column(db.String(100), nullable=False)
+    merk = db.Column(db.String(100))
+    satuan = db.Column(db.String(30), nullable=False, default='pcs')
+    harga_modal = db.Column(db.Float, nullable=False, default=0.0)
+    harga_jual = db.Column(db.Float, nullable=False, default=0.0)
+    supplier = db.Column(db.String(150))
+    stok = db.Column(db.Float, nullable=False, default=0.0)
+    minimal_stok = db.Column(db.Float, nullable=False, default=0.0)
+    lokasi_gudang = db.Column(db.String(100))
+    barcode = db.Column(db.String(100), unique=True)
+    status = db.Column(db.String(20), nullable=False, default='Aktif')
+
+    @property
+    def margin_persen(self):
+        if not self.harga_jual:
+            return 0.0
+        return round(((self.harga_jual - self.harga_modal) / self.harga_jual) * 100, 2)
+
+
+class InstallationPackage(db.Model):
+    __tablename__ = 'installation_package'
+
+    id = db.Column(db.Integer, primary_key=True)
+    kode = db.Column(db.String(50), unique=True, nullable=False)
+    nama = db.Column(db.String(150), nullable=False)
+    deskripsi = db.Column(db.Text)
+    garansi = db.Column(db.String(100))
+    status = db.Column(db.String(20), nullable=False, default='Aktif')
+    items = db.relationship('InstallationPackageItem', back_populates='package', cascade='all, delete-orphan', lazy=True)
+
+    @property
+    def total_modal(self):
+        return sum(item.quantity * ((item.material.harga_modal if item.material else item.service.harga_modal if item.service else 0) or 0) for item in self.items)
+
+    @property
+    def total_jual(self):
+        return sum(item.quantity * ((item.material.harga_jual if item.material else item.service.harga_jual if item.service else 0) or 0) for item in self.items)
+
+    @property
+    def margin_persen(self):
+        return round(((self.total_jual - self.total_modal) / self.total_jual) * 100, 2) if self.total_jual else 0.0
+
+
+class InstallationPackageItem(db.Model):
+    __tablename__ = 'installation_package_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('installation_package.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('ac_product.id'))
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'))
+    service_id = db.Column(db.Integer, db.ForeignKey('catalog_service.id'))
+    quantity = db.Column(db.Float, nullable=False, default=1.0)
+    package = db.relationship('InstallationPackage', back_populates='items')
+    product = db.relationship('ACProduct')
+    material = db.relationship('Material')
+    service = db.relationship('CatalogService')
+
+
+class Quotation(db.Model):
+    __tablename__ = 'quotation'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nomor = db.Column(db.String(50), unique=True, nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
+    alamat = db.Column(db.Text)
+    pic = db.Column(db.String(150))
+    tanggal = db.Column(db.Date, nullable=False, default=date.today)
+    berlaku_sampai = db.Column(db.Date)
+    diskon = db.Column(db.Float, nullable=False, default=0.0)
+    ppn_persen = db.Column(db.Float, nullable=False, default=0.0)
+    catatan = db.Column(db.Text)
+    syarat_pembayaran = db.Column(db.Text)
+    garansi = db.Column(db.Text)
+    tanda_tangan = db.Column(db.String(255))
+    status = db.Column(db.String(20), nullable=False, default='Draft')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    customer = db.relationship('Customer', backref=db.backref('quotations', lazy=True))
+    items = db.relationship('QuotationItem', back_populates='quotation', cascade='all, delete-orphan', lazy=True)
+
+    @property
+    def subtotal(self):
+        return sum(item.quantity * item.harga_satuan for item in self.items)
+
+    @property
+    def total(self):
+        after_discount = max(self.subtotal - self.diskon, 0)
+        return after_discount + (after_discount * self.ppn_persen / 100)
+
+
+class QuotationItem(db.Model):
+    __tablename__ = 'quotation_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_id = db.Column(db.Integer, db.ForeignKey('quotation.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('ac_product.id'))
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'))
+    service_id = db.Column(db.Integer, db.ForeignKey('catalog_service.id'))
+    package_id = db.Column(db.Integer, db.ForeignKey('installation_package.id'))
+    jenis_item = db.Column(db.String(20), nullable=False)
+    deskripsi = db.Column(db.String(255), nullable=False)
+    quantity = db.Column(db.Float, nullable=False, default=1.0)
+    harga_modal_snapshot = db.Column(db.Float, nullable=False, default=0.0)
+    harga_satuan = db.Column(db.Float, nullable=False, default=0.0)
+    quotation = db.relationship('Quotation', back_populates='items')
+    product = db.relationship('ACProduct')
+    material = db.relationship('Material')
+    service = db.relationship('CatalogService')
+    package = db.relationship('InstallationPackage')
+
+    @property
+    def subtotal(self):
+        return self.quantity * self.harga_satuan
+
+    @property
+    def profit(self):
+        return self.quantity * (self.harga_satuan - self.harga_modal_snapshot)
+
+
+class MaterialEstimate(db.Model):
+    __tablename__ = 'material_estimate'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nomor = db.Column(db.String(50), unique=True, nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
+    quotation_id = db.Column(db.Integer, db.ForeignKey('quotation.id'))
+    panjang_pipa = db.Column(db.Float, nullable=False, default=0.0)
+    jumlah_unit = db.Column(db.Integer, nullable=False, default=1)
+    biaya_tambahan = db.Column(db.Float, nullable=False, default=0.0)
+    catatan = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    customer = db.relationship('Customer')
+    quotation = db.relationship('Quotation')
+    items = db.relationship('MaterialEstimateItem', back_populates='estimate', cascade='all, delete-orphan', lazy=True)
+
+    @property
+    def biaya_material(self):
+        return sum(item.quantity * item.harga_modal_snapshot for item in self.items if item.jenis_item == 'Material')
+
+    @property
+    def biaya_jasa(self):
+        return sum(item.quantity * item.harga_modal_snapshot for item in self.items if item.jenis_item == 'Jasa')
+
+    @property
+    def harga_jual(self):
+        return sum(item.quantity * item.harga_jual_snapshot for item in self.items) + self.biaya_tambahan
+
+    @property
+    def profit(self):
+        return self.harga_jual - self.biaya_material - self.biaya_jasa
+
+
+class MaterialEstimateItem(db.Model):
+    __tablename__ = 'material_estimate_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    estimate_id = db.Column(db.Integer, db.ForeignKey('material_estimate.id'), nullable=False)
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'))
+    service_id = db.Column(db.Integer, db.ForeignKey('catalog_service.id'))
+    jenis_item = db.Column(db.String(20), nullable=False)
+    deskripsi = db.Column(db.String(255), nullable=False)
+    quantity = db.Column(db.Float, nullable=False, default=1.0)
+    harga_modal_snapshot = db.Column(db.Float, nullable=False, default=0.0)
+    harga_jual_snapshot = db.Column(db.Float, nullable=False, default=0.0)
+    estimate = db.relationship('MaterialEstimate', back_populates='items')
+    material = db.relationship('Material')
+    service = db.relationship('CatalogService')
 
 class Technician(db.Model):
     __tablename__ = "technician"
@@ -375,6 +677,23 @@ class BlastLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Project(db.Model):
+    __tablename__ = 'project'
+
+    id = db.Column(db.Integer, primary_key=True)
+    kode = db.Column(db.String(50), unique=True, nullable=False)
+    nama = db.Column(db.String(200), nullable=False)
+    tipe = db.Column(db.String(30), nullable=False, default='Customer')
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=True)
+    vendor = db.Column(db.String(200))
+    periode_mulai = db.Column(db.Date)
+    periode_selesai = db.Column(db.Date)
+    status = db.Column(db.String(30), nullable=False, default='Berjalan')
+    catatan = db.Column(db.Text)
+    customer = db.relationship('Customer', backref=db.backref('projects', lazy=True))
+    transactions = db.relationship('Transaction', back_populates='project', lazy=True)
+
+
 class Transaction(db.Model):
     __tablename__ = "transaction"
 
@@ -397,6 +716,8 @@ class Transaction(db.Model):
     # 🔹 foreign key ke Service
     service_id = db.Column(db.Integer, db.ForeignKey('service.id', ondelete="CASCADE"), nullable=True)
     service = db.relationship('Service', backref='transactions', lazy=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    project = db.relationship('Project', back_populates='transactions')
 
 class Claim(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -529,6 +850,18 @@ def normalize_wa(raw_wa):
     return cleaned
 
 
+REMINDER_SEND_LIMIT = 3
+
+
+def reminder_send_count(reminder):
+    if not reminder:
+        return 0
+    match = re.search(r'\((\d+)/3\)', reminder.keterangan_reminder or '')
+    if match:
+        return min(int(match.group(1)), REMINDER_SEND_LIMIT)
+    return 1 if reminder.reminder_sent else 0
+
+
 
     
 
@@ -541,6 +874,8 @@ def index():
 
 @app.route('/login', methods=['GET','POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
     if request.method=='POST':
         u = User.query.filter_by(username=request.form['username']).first()
         if u and u.check_password(request.form['password']):
@@ -684,7 +1019,244 @@ def dashboard():
         .group_by(Customer.id)
         .all()
     )
+    pending_claim_total = Claim.query.filter(func.lower(Claim.status) == 'pending').count()
+    unpaid_total = len(unpaid_services)
+    unpaid_amount = sum(
+        (service.harga_satuan or 0) * (service.jumlah or 1)
+        for service in unpaid_services
+    )
 
+    priority_items = []
+
+    for item in reminders:
+        priority_items.append({
+            "tab": "reminder",
+            "name": item["nama"],
+            "meta": item["unit"],
+            "label": item["tipe"],
+            "date": item["tanggal"].strftime("%d-%m-%Y") if hasattr(item["tanggal"], "strftime") else item["tanggal"],
+            "url": url_for('reminders_auto', tab='reminder'),
+        })
+
+    for service in unpaid_services[:5]:
+        customer = service.ac_unit.customer if service.ac_unit and service.ac_unit.customer else None
+        unit = service.ac_unit if service.ac_unit else None
+        if customer:
+            priority_items.append({
+                "tab": "unpaid",
+                "name": customer.nama,
+                "meta": f"{unit.merk} ({unit.pk}) x{unit.jumlah_unit}" if unit else '-',
+                "label": "Belum Lunas",
+                "date": service.tanggal.strftime("%d-%m-%Y") if service.tanggal else '-',
+                "url": url_for('unpaid_list', tab='unpaid'),
+            })
+
+    for customer in customers_with_claims:
+        pending_claims = [c for c in customer.claims if str(c.status).lower() == 'pending']
+        if pending_claims:
+            priority_items.append({
+                "tab": "claim",
+                "name": customer.nama,
+                "meta": f"{len(pending_claims)} claim pending",
+                "label": "Klaim",
+                "date": max((c.tanggal for c in pending_claims), default=date.today()).strftime("%d-%m-%Y") if isinstance(max((c.tanggal for c in pending_claims), default=date.today()), datetime) else date.today().strftime("%d-%m-%Y"),
+                "url": url_for('claim_list_all', tab='claim'),
+            })
+
+# ===========================================
+# DASHBOARD KPI
+# ===========================================
+
+    today = date.today()
+
+    bulan = today.month
+    tahun = today.year
+
+    # Customer
+    total_customer = Customer.query.count()
+
+    # Unit
+    total_unit = ACUnit.query.count()
+
+    # Teknisi
+    total_teknisi = Technician.query.count()
+
+    # Service Hari Ini
+    today_service = Service.query.filter(
+        Service.tanggal == today
+    ).count()
+
+    # Pendapatan Hari Ini
+    today_income = db.session.query(
+        func.coalesce(func.sum(Transaction.jumlah),0)
+    ).filter(
+        Transaction.kategori=="Pendapatan",
+        Transaction.tanggal==today
+    ).scalar()
+
+    # Beban Hari Ini
+    today_expense = db.session.query(
+        func.coalesce(func.sum(Transaction.jumlah),0)
+    ).filter(
+        Transaction.kategori=="Beban",
+        Transaction.tanggal==today
+    ).scalar()
+
+    # Pendapatan Bulan Ini
+    monthly_income = db.session.query(
+        func.coalesce(func.sum(Transaction.jumlah),0)
+    ).filter(
+        extract("month",Transaction.tanggal)==bulan,
+        extract("year",Transaction.tanggal)==tahun,
+        Transaction.kategori=="Pendapatan"
+    ).scalar()
+
+    # Beban Bulan Ini
+    monthly_expense = db.session.query(
+        func.coalesce(func.sum(Transaction.jumlah),0)
+    ).filter(
+        extract("month",Transaction.tanggal)==bulan,
+        extract("year",Transaction.tanggal)==tahun,
+        Transaction.kategori=="Beban"
+    ).scalar()
+
+    profit = monthly_income-monthly_expense
+
+    chart_income = []
+    for m in range(1, 13):
+        total = db.session.query(
+            func.coalesce(func.sum(Transaction.jumlah), 0)
+        ).filter(
+            Transaction.kategori == "Pendapatan",
+            extract("month", Transaction.tanggal) == m,
+            extract("year", Transaction.tanggal) == tahun
+        ).scalar()
+        chart_income.append(float(total))
+
+
+    top_teknisi = (
+    db.session.query(
+
+        Technician.nama,
+
+        func.coalesce(func.sum(Transaction.jumlah),0).label("omzet")
+
+    )
+
+    .join(Transaction)
+
+    .filter(
+
+        Transaction.kategori=="Pendapatan",
+
+        extract("month",Transaction.tanggal)==bulan,
+
+        extract("year",Transaction.tanggal)==tahun
+
+    )
+
+    .group_by(Technician.id)
+
+    .order_by(func.sum(Transaction.jumlah).desc())
+
+    .limit(5)
+
+    .all()
+
+)
+    
+    top_service = (
+
+    db.session.query(
+
+        Transaction.jenis,
+
+        func.count(Transaction.id)
+
+    )
+
+    .filter(
+
+        Transaction.kategori=="Pendapatan"
+
+    )
+
+    .group_by(Transaction.jenis)
+
+    .all()
+
+)
+    # ==========================
+# TOTAL TEKNISI
+# ==========================
+
+    total_teknisi = Technician.query.count()
+
+    total_teknisi_aktif = Technician.query.filter_by(
+        status="Aktif"
+    ).count()
+
+
+  # ==========================
+#Pendapatan Hari ini
+# ==========================
+    today_revenue = db.session.query(
+    func.coalesce(func.sum(Transaction.jumlah), 0)
+).filter(
+    Transaction.kategori == "Pendapatan",
+    Transaction.tanggal == date.today()
+).scalar()
+    
+ # ==========================
+#Pendapatan Bulan ini
+# ==========================
+    bulan = datetime.now().month
+    tahun = datetime.now().year
+
+    monthly_revenue = db.session.query(
+        func.coalesce(func.sum(Transaction.jumlah),0)
+    ).filter(
+
+        extract("month", Transaction.tanggal)==bulan,
+        extract("year",Transaction.tanggal)==tahun,
+        Transaction.kategori=="Pendapatan"
+
+    ).scalar()
+
+
+ # ==========================
+#Service Hari ini
+# ==========================
+    today_services = Service.query.filter(
+        Service.tanggal == date.today()
+    ).count()
+
+# ==========================
+#Customer Baru Bulan ini
+# ==========================
+    total_customer = Customer.query.count()
+
+    # ==========================
+#Grafik Omzet 12 Bulan
+# ==========================
+    monthly_chart = []
+
+    for m in range(1,13):
+
+        total = db.session.query(
+
+            func.coalesce(func.sum(Transaction.jumlah),0)
+
+        ).filter(
+
+            extract("month",Transaction.tanggal)==m,
+            extract("year",Transaction.tanggal)==tahun,
+            Transaction.kategori=="Pendapatan"
+
+        ).scalar()
+
+        monthly_chart.append(float(total))
+    
     return render_template(
         "dashboard_modern.html",
         total_customers=total_customers,
@@ -697,8 +1269,126 @@ def dashboard():
         unpaid_services=unpaid_services,
         best_sellers=best_sellers,
         best_cuci_packages=best_cuci_packages,
-        customers=customers_with_claims  # <-- kirim ke template
+        customers=customers_with_claims,
+        priority_items=priority_items,
+        total_teknisi=total_teknisi,
+        total_teknisi_aktif=total_teknisi_aktif,
+        today_revenue=today_revenue,
+        monthly_revenue=monthly_revenue,
+        monthly_chart=monthly_chart,
+        chart_income=chart_income,
+        top_teknisi=top_teknisi,
+        top_service=top_service
+        ,pending_claim_total=pending_claim_total
+        ,unpaid_total=unpaid_total
+        ,unpaid_amount=unpaid_amount
     )
+
+
+@app.route('/documents', methods=['GET', 'POST'])
+@login_required
+def documents():
+    document_types = ['Laporan', 'Invoice', 'Kontrak', 'SPK', 'Foto', 'Lainnya']
+    related_options = ['Proyek', 'Customer', 'Vendor', 'Teknisi', 'Internal']
+
+    if request.method == 'POST':
+        required_fields = ['nama_dokumen', 'jenis_dokumen']
+        if not all(request.form.get(field, '').strip() for field in required_fields):
+            flash('Nama dokumen dan jenis dokumen harus diisi.', 'danger')
+            return redirect(url_for('documents'))
+
+        uploaded = request.files.get('file')
+        if not uploaded or not uploaded.filename:
+            flash('File dokumen wajib diunggah.', 'warning')
+            return redirect(url_for('documents'))
+
+        safe_name = secure_filename(uploaded.filename)
+        if not safe_name:
+            flash('Nama file tidak valid.', 'danger')
+            return redirect(url_for('documents'))
+
+        doc_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'documents')
+        os.makedirs(doc_dir, exist_ok=True)
+        file_ext = os.path.splitext(safe_name)[1].lower()
+        unique_name = f"doc_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}{file_ext}"
+        file_path = os.path.join(doc_dir, unique_name)
+        uploaded.save(file_path)
+
+        tanggal_value = request.form.get('tanggal_dokumen') or date.today().isoformat()
+        try:
+            tanggal = datetime.strptime(tanggal_value, '%Y-%m-%d').date()
+        except ValueError:
+            tanggal = date.today()
+
+        doc = UploadedDocument(
+            nama=request.form.get('nama_dokumen', '').strip(),
+            nomor=(request.form.get('nomor_dokumen') or '').strip() or None,
+            jenis=request.form.get('jenis_dokumen') or 'Laporan',
+            terkait_dengan=request.form.get('terkait_dengan') or 'Proyek',
+            tanggal=tanggal,
+            periode=request.form.get('periode') or '',
+            deskripsi=request.form.get('deskripsi') or '',
+            status=request.form.get('status') or 'Final',
+            dibuat_oleh=request.form.get('dibuat_oleh') or current_user.username,
+            akses=request.form.get('akses') or 'Internal',
+            penting=bool(request.form.get('penting')),
+            tag=request.form.get('tag') or '',
+            file_name=unique_name,
+            original_name=safe_name,
+            mime_type=uploaded.mimetype or 'application/octet-stream'
+        )
+        db.session.add(doc)
+        db.session.commit()
+        flash('Dokumen berhasil disimpan.', 'success')
+        return redirect(url_for('documents'))
+
+    documents_list = UploadedDocument.query.order_by(UploadedDocument.created_at.desc()).all()
+    return render_template(
+        'documents.html',
+        documents=documents_list,
+        document_types=document_types,
+        related_options=related_options,
+        today_date=date.today().isoformat()
+    )
+
+
+@app.route('/documents/history')
+@login_required
+def documents_history():
+    docs = UploadedDocument.query.order_by(UploadedDocument.tanggal.desc(), UploadedDocument.created_at.desc()).all()
+    return render_template('documents_history.html', documents=docs, active='history')
+
+
+@app.route('/documents/templates')
+@login_required
+def document_templates():
+    templates = [
+        {'name': 'Template Laporan Service', 'format': 'PDF', 'updated_at': '2026-09-20'},
+        {'name': 'Template Invoice', 'format': 'DOCX', 'updated_at': '2026-09-20'},
+        {'name': 'Template Kontrak', 'format': 'PDF', 'updated_at': '2026-09-20'},
+        {'name': 'Template Rutin Cuci', 'format': 'XLSX', 'updated_at': '2026-09-20'},
+    ]
+    return render_template('documents_templates.html', templates=templates, active='templates')
+
+
+@app.route('/documents/archive')
+@login_required
+def documents_archive():
+    docs = UploadedDocument.query.filter(UploadedDocument.status.in_(['Draft', 'Review'])).order_by(UploadedDocument.tanggal.desc(), UploadedDocument.created_at.desc()).all()
+    if not docs:
+        docs = UploadedDocument.query.order_by(UploadedDocument.tanggal.desc(), UploadedDocument.created_at.desc()).limit(5).all()
+    return render_template('documents_archive.html', documents=docs, active='archive')
+
+
+@app.route('/documents/<int:doc_id>/download')
+@login_required
+def document_download(doc_id):
+    doc = UploadedDocument.query.get_or_404(doc_id)
+    path = os.path.join(app.config['UPLOAD_FOLDER'], 'documents', doc.file_name)
+    if not os.path.exists(path):
+        flash('File dokumen tidak ditemukan.', 'warning')
+        return redirect(url_for('documents'))
+    return send_file(path, as_attachment=True, download_name=doc.original_name, mimetype=doc.mime_type)
 
 # Route Blast
 
@@ -801,6 +1491,9 @@ def transactions():
 
     # 🔹 Ambil transaksi langsung dari tabel Transaction
     query = Transaction.query
+    project_id = request.args.get('project_id', type=int)
+    if project_id:
+        query = query.filter(Transaction.project_id == project_id)
 
     if start_date and end_date:
         try:
@@ -881,6 +1574,7 @@ def transactions():
 
         tahun=tahun, bulan=bulan, show_all=show_all,
         start_date=start_date, end_date=end_date
+        ,projects=Project.query.order_by(Project.nama).all(), project_id=project_id
     )
 
 
@@ -888,18 +1582,54 @@ def transactions():
 @app.route('/transaction/new', methods=['GET','POST'])
 @login_required
 def transaction_new():
+    def clean_money_value(value):
+        if value is None:
+            return 0.0
+        try:
+            if isinstance(value, (int, float)):
+                return float(value)
+            text = str(value).strip()
+            if not text:
+                return 0.0
+            text = re.sub(r'[^0-9,\.]', '', text)
+            if not text:
+                return 0.0
+
+            if ',' in text and '.' in text:
+                if text.rfind(',') > text.rfind('.'):
+                    text = text.replace('.', '').replace(',', '.')
+                else:
+                    text = text.replace(',', '')
+            elif ',' in text:
+                parts = text.split(',')
+                if len(parts) > 1 and len(parts[-1]) == 3 and all(part for part in parts[:-1]):
+                    text = ''.join(parts)
+                else:
+                    text = text.replace(',', '.')
+            elif '.' in text:
+                parts = text.split('.')
+                if len(parts) > 1 and len(parts[-1]) == 3 and all(part for part in parts[:-1]):
+                    text = ''.join(parts)
+
+            return float(text)
+        except (TypeError, ValueError):
+            return 0.0
+
     if request.method == 'POST':
         teknisi_id = request.form.get('technician_id')
         teknisi = None
         if teknisi_id:
             teknisi = Technician.query.get(int(teknisi_id))
 
+        deskripsi = (request.form.get('deskripsi') or '').strip()
+
         t = Transaction(
             tanggal=datetime.strptime(request.form.get('tanggal'), "%Y-%m-%d").date(),
             kategori=request.form.get('kategori'),   # Pendapatan / Beban
             jenis=request.form.get('jenis'),
-            deskripsi=request.form.get('deskripsi'),
-            jumlah=float(request.form.get('jumlah') or 0),
+            deskripsi=deskripsi,
+            jumlah=clean_money_value(request.form.get('jumlah')),
+            project_id=request.form.get('project_id', type=int) or None,
             technician_id=teknisi.id if teknisi else None,
             technician_nama=teknisi.nama if teknisi else None,
             team=teknisi.team if teknisi else None
@@ -908,11 +1638,196 @@ def transaction_new():
         db.session.add(t)
         db.session.commit()
         flash("✅ Transaksi ditambahkan", "success")
+        if t.project_id:
+            return redirect(url_for('projects', project_id=t.project_id))
         return redirect(url_for('transactions'))
 
-    # Ambil daftar teknisi untuk dropdown di form
-    teknisi_all = Technician.query.all()
-    return render_template("transaction_form_modern.html", teknisi_all=teknisi_all)
+    # Ambil daftar teknisi yang aktif saja
+    teknisi_all = Technician.query.filter_by(status='Aktif').order_by(Technician.nama).all()
+    selected_project_id = request.args.get('project_id', type=int)
+    return render_template(
+        "transaction_form_modern.html",
+        teknisi_all=teknisi_all,
+        projects=Project.query.filter_by(status='Berjalan').order_by(Project.nama).all(),
+        selected_project_id=selected_project_id,
+    )
+
+
+@app.route('/projects', methods=['GET', 'POST'])
+@login_required
+def projects():
+    if request.method == 'POST':
+        mulai = request.form.get('periode_mulai') or None
+        selesai = request.form.get('periode_selesai') or None
+        tipe = request.form.get('tipe') or 'Customer'
+        year = datetime.strptime(mulai, '%Y-%m-%d').year if mulai else datetime.utcnow().year
+        code_prefix = 'VND' if tipe.lower() == 'vendor' else 'CUS'
+        code_pattern = f'{code_prefix}-{year}-'
+        existing_codes = Project.query.filter(Project.kode.like(f'{code_pattern}%')).all()
+        sequence = 1
+        for existing in existing_codes:
+            try:
+                sequence = max(sequence, int(existing.kode.rsplit('-', 1)[-1]) + 1)
+            except (ValueError, AttributeError):
+                continue
+        generated_code = f'{code_pattern}{sequence:03d}'
+        project = Project(
+            kode=generated_code,
+            nama=request.form.get('nama', '').strip(),
+            tipe=tipe,
+            customer_id=request.form.get('customer_id', type=int) or None,
+            vendor=request.form.get('vendor'),
+            periode_mulai=datetime.strptime(mulai, '%Y-%m-%d').date() if mulai else None,
+            periode_selesai=datetime.strptime(selesai, '%Y-%m-%d').date() if selesai else None,
+            status=request.form.get('status') or 'Berjalan',
+            catatan=request.form.get('catatan')
+        )
+        if not project.nama or Project.query.filter_by(kode=project.kode).first():
+            flash('Nama proyek wajib diisi dan kode otomatis harus unik.', 'danger')
+        else:
+            db.session.add(project)
+            db.session.commit()
+            flash('Proyek berhasil dibuat.', 'success')
+        return redirect(url_for('projects'))
+
+    status_filter = request.args.get('status', '').strip()
+    selected_id = request.args.get('project_id', type=int)
+    expense_category = request.args.get('expense_category', '').strip()
+    expense_query = request.args.get('expense_query', '').strip()
+    expense_start = request.args.get('expense_start', '').strip()
+    expense_end = request.args.get('expense_end', '').strip()
+    try:
+        expense_start_date = datetime.strptime(expense_start, '%Y-%m-%d').date() if expense_start else None
+    except ValueError:
+        expense_start_date = None
+    try:
+        expense_end_date = datetime.strptime(expense_end, '%Y-%m-%d').date() if expense_end else None
+    except ValueError:
+        expense_end_date = None
+
+    all_projects = Project.query.order_by(Project.id.desc()).all()
+    visible_projects = [project for project in all_projects if not status_filter or project.status == status_filter]
+    rows = []
+    for project in visible_projects:
+        transactions = sorted(
+            project.transactions,
+            key=lambda transaction: (transaction.tanggal or date.min, transaction.id or 0),
+            reverse=True,
+        )
+        if project.id == selected_id and any((expense_category, expense_query, expense_start_date, expense_end_date)):
+            transactions = [
+                transaction for transaction in transactions
+                if (not expense_category or transaction.kategori == expense_category)
+                and (not expense_start_date or (transaction.tanggal and transaction.tanggal >= expense_start_date))
+                and (not expense_end_date or (transaction.tanggal and transaction.tanggal <= expense_end_date))
+                and (not expense_query or expense_query.lower() in ' '.join([
+                    transaction.jenis or '', transaction.deskripsi or ''
+                ]).lower())
+            ]
+        income = sum(t.jumlah for t in transactions if t.kategori == 'Pendapatan')
+        expense = sum(t.jumlah for t in transactions if t.kategori == 'Beban')
+        paid = sum(t.jumlah for t in transactions if t.kategori == 'Pendapatan' and getattr(t, 'status', None) == 'Dibayar')
+        receivable = max(income - paid, 0)
+        chart_income = [0, 0, 0, 0]
+        chart_expense = [0, 0, 0, 0]
+        expense_categories = defaultdict(float)
+        for transaction in transactions:
+            bucket = min(max(((transaction.tanggal.day if transaction.tanggal else 1) - 1) // 7, 0), 3)
+            if transaction.kategori == 'Pendapatan':
+                chart_income[bucket] += transaction.jumlah or 0
+            elif transaction.kategori == 'Beban':
+                chart_expense[bucket] += transaction.jumlah or 0
+                expense_categories[transaction.jenis or 'Lainnya'] += transaction.jumlah or 0
+        expense_breakdown = []
+        category_colors = ['#2d8cf0', '#2bb673', '#f2a900', '#8b5cf6', '#ef5b67', '#aab7c9']
+        category_start = 0
+        if expense:
+            for index, (category, amount) in enumerate(sorted(expense_categories.items(), key=lambda item: item[1], reverse=True)):
+                category_end = 100 if index == len(expense_categories) - 1 else category_start + (amount / expense * 100)
+                expense_breakdown.append({
+                    'label': category,
+                    'amount': amount,
+                    'percent': amount / expense * 100,
+                    'start': category_start,
+                    'end': category_end,
+                    'color': category_colors[index % len(category_colors)],
+                })
+                category_start = category_end
+        rows.append({
+            'project': project,
+            'income': income,
+            'expense': expense,
+            'profit': income - expense,
+            'paid': paid,
+            'receivable': receivable,
+            'transactions': transactions,
+            'chart_income': chart_income,
+            'chart_expense': chart_expense,
+            'expense_categories': sorted(expense_categories.items(), key=lambda item: item[1], reverse=True),
+            'expense_breakdown': expense_breakdown,
+        })
+
+    selected = None
+    if selected_id:
+        selected = next((row for row in rows if row['project'].id == selected_id), rows[0] if rows else None)
+    elif rows:
+        selected = rows[0]
+
+    for row in rows:
+        row['selected'] = row is selected
+
+    return render_template(
+        'projects.html',
+        projects=rows,
+        selected_project=selected,
+        status_filter=status_filter,
+        expense_category=expense_category,
+        expense_query=expense_query,
+        expense_start=expense_start,
+        expense_end=expense_end,
+        customers=Customer.query.order_by(Customer.nama).all(),
+    )
+
+
+@app.route('/projects/<int:id>')
+@login_required
+def project_detail(id):
+    project = Project.query.get_or_404(id)
+    transactions = Transaction.query.filter_by(project_id=id).order_by(Transaction.tanggal.desc()).all()
+    income = sum(t.jumlah for t in transactions if t.kategori == 'Pendapatan')
+    expense = sum(t.jumlah for t in transactions if t.kategori == 'Beban')
+    return render_template('project_detail.html', project=project, transactions=transactions, income=income, expense=expense, profit=income-expense)
+
+
+@app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def project_edit(id):
+    project = Project.query.get_or_404(id)
+
+    if request.method == 'POST':
+        mulai = request.form.get('periode_mulai') or None
+        selesai = request.form.get('periode_selesai') or None
+        project.nama = request.form.get('nama', '').strip()
+        project.tipe = request.form.get('tipe') or 'Customer'
+        project.customer_id = request.form.get('customer_id', type=int) or None
+        project.vendor = request.form.get('vendor', '').strip() or None
+        project.periode_mulai = datetime.strptime(mulai, '%Y-%m-%d').date() if mulai else None
+        project.periode_selesai = datetime.strptime(selesai, '%Y-%m-%d').date() if selesai else None
+        project.status = request.form.get('status') or 'Berjalan'
+        project.catatan = request.form.get('catatan', '').strip() or None
+
+        if not project.nama:
+            flash('Nama proyek wajib diisi.', 'danger')
+        else:
+            db.session.commit()
+            flash('Proyek berhasil diperbarui.', 'success')
+            return redirect(url_for('projects', project_id=project.id))
+
+    return render_template(
+        'project_edit.html',
+        project=project,
+        customers=Customer.query.order_by(Customer.nama).all(),
+    )
 
 
 @app.route('/transaction/<int:id>/delete', methods=['POST'])
@@ -973,6 +1888,9 @@ def laba_rugi():
     end_date = request.args.get('end_date')
 
     query = Transaction.query
+    project_id = request.args.get('project_id', type=int)
+    if project_id:
+        query = query.filter(Transaction.project_id == project_id)
 
     if start_date and end_date:
         try:
@@ -1011,7 +1929,8 @@ def laba_rugi():
         format_date=format_date,
         current_year=datetime.today().year,
         current_month=datetime.today().month,
-        bulan_names=bulan_names   # ✅ kirim ke template
+        bulan_names=bulan_names,
+        projects=Project.query.order_by(Project.nama).all(), project_id=project_id
     )
 
 def format_date(date_str):
@@ -1082,7 +2001,8 @@ def claim_list(customer_id):
 @login_required
 def claim_list_all():
     claims = Claim.query.order_by(Claim.tanggal.desc()).all()
-    return render_template('Claim/list.html', claims=claims, customer=None)
+    active_tab = request.args.get('tab', 'claim')
+    return render_template('Claim/list.html', claims=claims, customer=None, active_tab=active_tab)
 
 
 @app.route('/claim/edit/<int:claim_id>', methods=['GET', 'POST'])
@@ -1257,10 +2177,14 @@ def arus_kas():
     tahun = request.args.get('tahun', datetime.today().year, type=int)
     bulan = request.args.get('bulan', datetime.today().month, type=int)
 
-    trans = Transaction.query.filter(
+    query = Transaction.query.filter(
         extract('year', Transaction.tanggal) == tahun,
         extract('month', Transaction.tanggal) == bulan
-    ).all()
+    )
+    project_id = request.args.get('project_id', type=int)
+    if project_id:
+        query = query.filter(Transaction.project_id == project_id)
+    trans = query.all()
 
     kas_masuk = sum(t.jumlah for t in trans if t.kategori == "Pendapatan")
     kas_keluar = sum(t.jumlah for t in trans if t.kategori == "Beban")
@@ -1272,7 +2196,7 @@ def arus_kas():
         kas_masuk=kas_masuk,
         kas_keluar=kas_keluar,
         saldo=saldo,
-        trans=trans
+        trans=trans, projects=Project.query.order_by(Project.nama).all(), project_id=project_id
     )
 
 
@@ -1434,9 +2358,6 @@ def customers_delete(id):
     db.session.delete(c); db.session.commit()
     flash('Customer dihapus', 'success')
     return redirect(url_for('customers'))
-
-from sqlalchemy.orm import joinedload
-from sqlalchemy import func
 
 @app.route('/customers/<int:cid>/units')
 @login_required
@@ -1738,6 +2659,14 @@ def service_edit(id):
         s.deskripsi = request.form.get('deskripsi')
         s.pembayaran = request.form.get('pembayaran')
 
+        # Setelah service cuci dilakukan, jadwal berikutnya dihitung ulang
+        # dari tanggal service agar tanggal reminder lama tidak terpakai.
+        if (
+            s.jenis_service and 'cuci' in s.jenis_service.lower()
+            and s.tanggal_cuci_berikutnya <= s.tanggal
+        ):
+            s.tanggal_cuci_berikutnya = s.tanggal + relativedelta(months=3)
+
         # 🟩 Teknisi
         s.technician_id = teknisi.id if teknisi else None
         s.teknisi = teknisi.nama if teknisi else None
@@ -1819,7 +2748,40 @@ def service_delete(id):
     return redirect(url_for('units', cid=cid))
 
 
-from sqlalchemy.orm import joinedload
+@app.route('/service/<int:id>/unpaid-reminder', methods=['POST'])
+@login_required
+def unpaid_service_reminder(id):
+    service = Service.query.get_or_404(id)
+    customer = service.ac_unit.customer if service.ac_unit and service.ac_unit.customer else None
+
+    if not customer:
+        return jsonify(success=False, message='Customer tidak ditemukan untuk service ini.'), 404
+
+    nomor_wa = customer.nomor_wa
+    if not nomor_wa:
+        return jsonify(success=False, message='Nomor WA customer belum terdaftar.'), 400
+
+    total = (
+        service.harga_total
+        if getattr(service, 'harga_total', None) is not None else
+        service.harga
+        if getattr(service, 'harga', None) is not None else
+        (service.harga_satuan or 0) * (service.jumlah or 1)
+    )
+
+    pesan = (
+        f"Halo Kak *{customer.nama}*, 👋\n\n"
+        "Kami dari *PERKASA AC* ingin mengingatkan bahwa status service Anda masih *Belum Lunas*.\n\n"
+        f"📌 Service: *{service.jenis_service or '-'}*\n"
+        f"💰 Total Tagihan: *Rp {total:,.0f}*\n"
+        f"📅 Tanggal Service: *{service.tanggal.strftime('%d-%m-%Y') if service.tanggal else '-'}*\n\n"
+        "Silakan segera melakukan pembayaran agar proses administrasi dapat kami lanjutkan.\n"
+        "Terima kasih atas kepercayaannya 🙏"
+    )
+
+    encoded_pesan = quote(pesan)
+    wa_url = f"https://web.whatsapp.com/send?phone={nomor_wa}&text={encoded_pesan}"
+    return jsonify(success=True, message='Reminder WhatsApp dibuat', wa_url=wa_url)
 
 
 @app.route('/unpaid', endpoint='unpaid_list')
@@ -1862,6 +2824,8 @@ def unpaid_list():
         else:
             total_belum_lunas += (getattr(s, 'harga_satuan', 0) or 0) * (getattr(s, 'jumlah', 1) or 1)
 
+    active_tab = request.args.get('tab', 'unpaid')
+
     return render_template(
         'unpaid_list.html',
         unpaid_services=unpaid_services,
@@ -1869,7 +2833,8 @@ def unpaid_list():
         bulan=bulan,
         tahun=tahun,
         technician_id=technician_id,
-        total_belum_lunas=total_belum_lunas  # kirim ke template
+        total_belum_lunas=total_belum_lunas,
+        active_tab=active_tab
     )
 
 ### INVOICE
@@ -2004,10 +2969,6 @@ def bank_account_delete(id):
     flash("Rekening bank berhasil dihapus!", "success")
     return redirect(url_for('bank_account_list'))
 
-
-
-
-from flask import render_template, request, Response, current_app
 
 
 @app.route("/invoice/<int:id>/pdf")
@@ -2157,8 +3118,6 @@ def invoice_pdf(id):
     )
 
 
-
-from datetime import datetime, date
 # =============================
 # FUNCTION TERBILANG
 # =============================
@@ -2557,14 +3516,31 @@ def payroll_index():
 
     payrolls = query.order_by(Payroll.periode.desc()).all()
 
-    technicians = Technician.query.filter_by(status="Aktif") \
+    technicians = Technician.query.filter_by(status="Aktif", team="Internal") \
                                   .order_by(Technician.nama) \
                                   .all()
+
+    # Hitung periode valid (bulan berjalan + 3 bulan sebelumnya)
+    today = date.today()
+    valid_periods = []
+    
+    for i in range(4):  # Bulan ini + 3 bulan sebelumnya
+        target_date = today - relativedelta(months=i)
+        periode_str = target_date.strftime('%Y-%m')
+        periode_display = target_date.strftime('%B %Y')
+        valid_periods.append({
+            'value': periode_str,
+            'display': periode_display
+        })
+    
+    valid_periods.reverse()  # Urutkan dari yang paling lama
 
     return render_template(
         'payroll/index.html',
         payrolls=payrolls,
-        technicians=technicians
+        technicians=technicians,
+        valid_periods=valid_periods,
+        current_periode=today.strftime('%Y-%m')
     )
 
 
@@ -2747,6 +3723,21 @@ def generate_payroll():
         tahun, bulan = map(int, periode.split('-'))
     except ValueError:
         flash("❌ Format periode tidak valid (YYYY-MM).", "danger")
+        return redirect(url_for('payroll_index'))
+
+    # Validasi periode hanya bulan berjalan + 3 bulan sebelumnya
+    today = date.today()
+    valid_periods = []
+    
+    for i in range(4):  # Bulan ini + 3 bulan sebelumnya
+        target_date = today - relativedelta(months=i)
+        periode_str = target_date.strftime('%Y-%m')
+        valid_periods.append(periode_str)
+    
+    if periode not in valid_periods:
+        last_valid = valid_periods[0]
+        first_valid = valid_periods[-1]
+        flash(f"❌ Periode hanya bisa antara {first_valid} hingga {last_valid}.", "danger")
         return redirect(url_for('payroll_index'))
 
     if employee_ids:
@@ -3130,18 +4121,6 @@ def payroll_undo_final(id):
     return redirect(url_for('payroll_detail', id=id))
 
 
-import pdfkit
-from flask import make_response, render_template
-from flask import make_response, render_template, request
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import mm
-from datetime import datetime
-import io
-
-
 @app.route('/payroll/<int:id>/print')
 @login_required
 def payroll_print(id):
@@ -3176,83 +4155,188 @@ def payroll_print(id):
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer, pagesize=A4,
-            rightMargin=20*mm, leftMargin=20*mm,
-            topMargin=15*mm, bottomMargin=15*mm
+            rightMargin=12*mm, leftMargin=12*mm,
+            topMargin=12*mm, bottomMargin=12*mm
         )
         styles = getSampleStyleSheet()
         content = []
 
-        # Header perusahaan
+        navy = colors.HexColor('#0f172a')
+        blue = colors.HexColor('#0f4c81')
+        blue_soft = colors.HexColor('#dbeafe')
+        light = colors.HexColor('#f8fafc')
+        line = colors.HexColor('#cbd5e1')
+        text = colors.HexColor('#1f2937')
+        muted = colors.HexColor('#475569')
+        green = colors.HexColor('#15803d')
+        red = colors.HexColor('#dc2626')
+
+        title_style = ParagraphStyle(
+            'TitleStyle', parent=styles['Title'],
+            fontName='Helvetica-Bold', fontSize=18, leading=20,
+            textColor=navy, alignment=1, spaceAfter=8
+        )
+        subtitle_style = ParagraphStyle(
+            'SubTitleStyle', parent=styles['Normal'],
+            fontName='Helvetica', fontSize=9.5, leading=12,
+            textColor=muted
+        )
+        label_style = ParagraphStyle(
+            'LabelStyle', parent=styles['BodyText'],
+            fontName='Helvetica', fontSize=9, leading=12,
+            textColor=muted
+        )
+        value_style = ParagraphStyle(
+            'ValueStyle', parent=styles['BodyText'],
+            fontName='Helvetica-Bold', fontSize=9, leading=12,
+            textColor=navy
+        )
+        section_style = ParagraphStyle(
+            'SectionStyle', parent=styles['Heading2'],
+            fontName='Helvetica-Bold', fontSize=10.5, leading=14,
+            textColor=navy, spaceBefore=2, spaceAfter=5
+        )
+        normal_cell_style = ParagraphStyle(
+            'NormalCellStyle', parent=styles['BodyText'],
+            fontName='Helvetica', fontSize=9, leading=11,
+            textColor=text
+        )
+        amount_style = ParagraphStyle(
+            'AmountStyle', parent=styles['BodyText'],
+            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            textColor=navy, alignment=2
+        )
+        negative_amount_style = ParagraphStyle(
+            'NegativeAmountStyle', parent=styles['BodyText'],
+            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            textColor=red, alignment=2
+        )
+        total_label_style = ParagraphStyle(
+            'TotalLabelStyle', parent=styles['BodyText'],
+            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            textColor=navy
+        )
+        total_value_style = ParagraphStyle(
+            'TotalValueStyle', parent=styles['BodyText'],
+            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            textColor=navy, alignment=2
+        )
+        grand_total_style = ParagraphStyle(
+            'GrandTotalStyle', parent=styles['Heading2'],
+            fontName='Helvetica-Bold', fontSize=17, leading=18,
+            textColor=green, alignment=1
+        )
+
+        # modern header + brand block
         try:
-            logo = Image("static/logo.png", width=40*mm, height=20*mm)
-            logo.hAlign = 'LEFT'
-            content.append(logo)
-        except:
-            pass
+            logo = Image("static/logo.png", width=20*mm, height=20*mm)
+            logo_cell = logo
+        except Exception:
+            logo_cell = Paragraph("", subtitle_style)
 
-        content.append(Paragraph("<b>Perkasa AC</b>", styles["Normal"]))
-        content.append(Paragraph("Jl. Sukabangun 2, KM 6.5, Palembang", styles["Normal"]))
-        content.append(Spacer(1, 10))
-        content.append(Paragraph("<b><font size=16>Slip Gaji</font></b>", styles["Heading4"]))
-        content.append(Spacer(1, 10))
-
-        # Data karyawan
-        data_karyawan = [
-            ["Nama / NIK", ":", employee.nama],
-            ["Jabatan", ":", employee.jabatan or "-"],
-            ["Tanggal Masuk", ":", employee.tanggal_masuk.strftime("%d-%m-%Y") if employee.tanggal_masuk else "-"],
-            ["Periode", ":", payroll.periode or "-"],
-        ]
-        table_karyawan = Table(data_karyawan, colWidths=[100, 10, 300])
-        table_karyawan.setStyle(TableStyle([
-            ("FONTSIZE", (0,0), (-1,-1), 10),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        brand_header = Table([
+            [logo_cell, Paragraph("<b>PERKASA AC</b>", title_style), Paragraph("<b>Slip Gaji</b>", title_style)]
+        ], colWidths=[26*mm, 70*mm, 65*mm], hAlign='LEFT')
+        brand_header.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), blue_soft),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (-1,-1), 8),
+            ('RIGHTPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('GRID', (0,0), (-1,-1), 0.5, blue_soft),
         ]))
-        content.append(table_karyawan)
+        content.append(brand_header)
         content.append(Spacer(1, 10))
 
-        # Pendapatan & potongan
-        pendapatan = [["<b>Pendapatan</b>", ""]]
-        potongan = [["<b>Potongan</b>", ""]]
+        employee_rows = [
+            [Paragraph("Nama / NIK", label_style), Paragraph(":", label_style), Paragraph(employee.nama or "-", value_style)],
+            [Paragraph("Jabatan", label_style), Paragraph(":", label_style), Paragraph(employee.jabatan or "-", value_style)],
+            [Paragraph("Tanggal Masuk", label_style), Paragraph(":", label_style), Paragraph(employee.tanggal_masuk.strftime("%d-%m-%Y") if employee.tanggal_masuk else "-", value_style)],
+            [Paragraph("Periode", label_style), Paragraph(":", label_style), Paragraph(payroll.periode or "-", value_style)],
+        ]
+        employee_table = Table(employee_rows, colWidths=[34*mm, 7*mm, 118*mm])
+        employee_table.setStyle(TableStyle([
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('TOPPADDING', (0,0), (-1,-1), 3),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        content.append(employee_table)
+        content.append(Spacer(1, 12))
 
-        for i in items:
-            if i.kategori == "Pendapatan":
-                pendapatan.append([i.deskripsi, f"{i.jumlah:,.0f}"])
-            elif i.kategori == "Potongan":
-                potongan.append([i.deskripsi, f"-{i.jumlah:,.0f}"])
+        pendapatan_rows = [[Paragraph("<b>Pendapatan</b>", section_style), Paragraph("", section_style)]]
+        for item in items:
+            if item.kategori == "Pendapatan":
+                pendapatan_rows.append([
+                    Paragraph(item.deskripsi or "-", normal_cell_style),
+                    Paragraph(f"Rp {item.jumlah:,.0f}", amount_style),
+                ])
+        pendapatan_rows.append([
+            Paragraph("<b>Total Pendapatan</b>", total_label_style),
+            Paragraph(f"Rp {total_pendapatan:,.0f}", total_value_style),
+        ])
 
-        pendapatan.append(["Total Pendapatan", f"{total_pendapatan:,.0f}"])
-        potongan.append(["Total Potongan", f"-{total_potongan:,.0f}"])
+        potongan_rows = [[Paragraph("<b>Potongan</b>", section_style), Paragraph("", section_style)]]
+        for item in items:
+            if item.kategori == "Potongan":
+                potongan_rows.append([
+                    Paragraph(item.deskripsi or "-", normal_cell_style),
+                    Paragraph(f"-Rp {item.jumlah:,.0f}", negative_amount_style),
+                ])
+        potongan_rows.append([
+            Paragraph("<b>Total Potongan</b>", total_label_style),
+            Paragraph(f"-Rp {total_potongan:,.0f}", negative_amount_style),
+        ])
 
-        table_pendapatan = Table(pendapatan, colWidths=[200, 80])
-        table_potongan = Table(potongan, colWidths=[200, 80])
+        table_pendapatan = Table(pendapatan_rows, colWidths=[62*mm, 26*mm])
+        table_potongan = Table(potongan_rows, colWidths=[62*mm, 26*mm])
 
-        for t in [table_pendapatan, table_potongan]:
-            t.setStyle(TableStyle([
-                ("ALIGN", (1,0), (-1,-1), "RIGHT"),
-                ("FONTSIZE", (0,0), (-1,-1), 10),
-                ("GRID", (0,-1), (-1,-1), 0.3, colors.grey),
+        for table_item in [table_pendapatan, table_potongan]:
+            table_item.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), blue_soft),
+                ('GRID', (0,0), (-1,-1), 0.8, line),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
+                ('LEFTPADDING', (0,0), (-1,-1), 7),
+                ('RIGHTPADDING', (0,0), (-1,-1), 7),
+                ('TOPPADDING', (0,0), (-1,-1), 6),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, light]),
             ]))
 
-        table_duo = Table([[table_pendapatan, table_potongan]], colWidths=[250, 250])
-        table_duo.setStyle(TableStyle([("VALIGN", (0,0), (-1,-1), "TOP")]))
-        content.append(table_duo)
-        content.append(Spacer(1, 15))
+        summary_table = Table([[table_pendapatan, table_potongan]], colWidths=[88*mm, 88*mm])
+        summary_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+            ('SPACING', (0,0), (-1,-1), 0),
+        ]))
+        content.append(summary_table)
+        content.append(Spacer(1, 18))
 
-        # Total gaji bersih
-        content.append(Paragraph("<b>Total Diterima:</b>", styles["Heading4"]))
-        content.append(Paragraph(f"<font size=14><b>Rp {gaji_bersih:,.0f}</b></font>", styles["Heading4"]))
+        grand_total_table = Table([
+            [Paragraph("<b>Total Diterima</b>", total_label_style), Paragraph(f"<b>Rp {gaji_bersih:,.0f}</b>", grand_total_style)]
+        ], colWidths=[78*mm, 76*mm])
+        grand_total_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#ecfdf5')),
+            ('GRID', (0,0), (-1,-1), 1.2, line),
+            ('ALIGN', (1,0), (1,0), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (-1,-1), 10),
+            ('RIGHTPADDING', (0,0), (-1,-1), 10),
+            ('TOPPADDING', (0,0), (-1,-1), 10),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+        ]))
+        content.append(grand_total_table)
+        content.append(Spacer(1, 16))
+
+        content.append(Paragraph(f"Dicetak pada: {datetime.now().strftime('%d/%m/%Y %H:%M')}", subtitle_style))
         content.append(Spacer(1, 10))
+        content.append(Paragraph("Tanda Tangan Karyawan", subtitle_style))
+        content.append(Spacer(1, 8))
+        content.append(Paragraph("__________________________", subtitle_style))
 
-
-
-        # Footer
-        content.append(Paragraph(f"Dicetak pada: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles["Normal"]))
-        content.append(Spacer(1, 15))
-        content.append(Paragraph("__________________________", styles["Normal"]))
-        content.append(Paragraph("Tanda Tangan Karyawan", styles["Normal"]))
-
-        # Bangun PDF
         doc.build(content)
         pdf = buffer.getvalue()
         buffer.close()
@@ -3430,6 +4514,7 @@ def debug_kasbon(tech_id):
 @login_required
 def reminders_auto():
     today = date.today()
+    active_tab = request.args.get('tab', 'reminder')
 
     services = (
     Service.query
@@ -3439,51 +4524,41 @@ def reminders_auto():
 )
 
 
-    # -------------------------
-    # KUMPULKAN DATA PER CUSTOMER
-    # -------------------------
-    grouped = {}   # key = customer_id, value = service info terdekat
+    # Ambil hanya service cuci terakhir untuk setiap customer. Dengan begitu,
+    # service lama tidak dapat menampilkan reminder setelah customer cuci lagi.
+    latest_cuci = {}
+    for service in services:
+        if not service.jenis_service or 'cuci' not in service.jenis_service.lower():
+            continue
+        customer_id = service.ac_unit.customer_id
+        previous = latest_cuci.get(customer_id)
+        if not previous or service.tanggal > previous.tanggal:
+            latest_cuci[customer_id] = service
 
-    for s in services:
-
-        # fallback next_date
+    grouped = {}
+    for s in latest_cuci.values():
         next_date = s.tanggal_cuci_berikutnya or (s.tanggal + relativedelta(months=3))
+        if next_date <= s.tanggal:
+            next_date = s.tanggal + relativedelta(months=3)
+
         delta_days = (next_date - today).days
-        if not (1 <= delta_days <= 14):
+        # Tampilkan H-14 s/d H-1 dan jadwal terlewat maksimal satu bulan.
+        if delta_days > 14 or next_date < today - relativedelta(months=1):
             continue
 
         unit = s.ac_unit
         cust = unit.customer
-
-        cust_id = cust.id
-
-        # Jika belum ada entry untuk customer ini → masukkan
-        if cust_id not in grouped:
-            grouped[cust_id] = {
-                "id": s.id,
-                "nama": cust.nama,
-                "wa": cust.nomor_wa,
-                "alamat": cust.alamat,
-                "team": cust.team,
-                "unit": f"{unit.merk} ({unit.pk}) x{unit.jumlah_unit}",
-                "tanggal": next_date,
-                "delta": delta_days,
-                "service": s
-            }
-        else:
-            # Sudah ada → pilih service yg tanggalnya lebih dekat (lebih kecil)
-            if next_date < grouped[cust_id]["tanggal"]:
-                grouped[cust_id] = {
-                    "id": s.id,
-                    "nama": cust.nama,
-                    "wa": cust.nomor_wa,
-                    "alamat": cust.alamat,
-                    "team": cust.team,
-                    "unit": f"{unit.merk} ({unit.pk}) x{unit.jumlah_unit}",
-                    "tanggal": next_date,
-                    "delta": delta_days,
-                    "service": s
-                }
+        grouped[cust.id] = {
+            "id": s.id,
+            "nama": cust.nama,
+            "wa": cust.nomor_wa,
+            "alamat": cust.alamat,
+            "team": cust.team,
+            "unit": f"{unit.merk} ({unit.pk}) x{unit.jumlah_unit}",
+            "tanggal": next_date,
+            "delta": delta_days,
+            "service": s
+        }
 
     reminders = []
 
@@ -3491,6 +4566,14 @@ def reminders_auto():
     for cust_id, data in grouped.items():
         s = data["service"]
         reminder = Reminder.query.filter_by(service_id=s.id).first()
+        if data["delta"] < 0:
+            status_reminder = f"Lewat {abs(data['delta'])} hari"
+        elif data["delta"] == 0:
+            status_reminder = "Hari Ini"
+        else:
+            status_reminder = f"H-{data['delta']}"
+
+        send_count = reminder_send_count(reminder)
 
         reminders.append({
             "id": s.id,
@@ -3500,13 +4583,14 @@ def reminders_auto():
             "team": data["team"],
             "unit": data["unit"],
             "tanggal": data["tanggal"],
-            "tipe": f"H-{data['delta']}",
+            "tipe": status_reminder,
             "keterangan": reminder.keterangan_reminder if reminder else "Belum di-Reminder",
-            "reminder_sent": getattr(reminder, 'reminder_sent', False)
+            "reminder_sent": send_count > 0,
+            "send_count": send_count
         })
 
     reminders = sorted(reminders, key=lambda x: x["tanggal"])
-    return render_template("reminders_auto.html", reminders=reminders, current_date=today)
+    return render_template("reminders_auto.html", reminders=reminders, current_date=today, active_tab=active_tab)
 
 
 @app.route('/reminder/send/<int:id>', methods=['POST'])
@@ -3541,13 +4625,21 @@ def reminder_send(id):
 
         # ✅ Update atau buat Reminder
         reminder = Reminder.query.filter_by(service_id=id).first()
+        send_count = reminder_send_count(reminder)
+        if send_count >= REMINDER_SEND_LIMIT:
+            return jsonify(
+                success=False,
+                message=f"Reminder sudah dikirim maksimal {REMINDER_SEND_LIMIT} kali."
+            ), 429
+
+        send_count += 1
         if reminder:
-            reminder.keterangan_reminder = "Sudah di-Reminder"
+            reminder.keterangan_reminder = f"Sudah di-Reminder ({send_count}/3)"
             reminder.reminder_sent = True
         else:
             reminder = Reminder(
                 service_id=id,
-                keterangan_reminder="Sudah di-Reminder",
+                keterangan_reminder=f"Sudah di-Reminder ({send_count}/3)",
                 reminder_sent=True
             )
             db.session.add(reminder)
@@ -3976,10 +5068,54 @@ def attendance_report():
         extract('year', Attendance.tanggal) == year
     ).order_by(Attendance.tanggal, Attendance.jam_masuk).all()
 
-    technicians = Technician.query.order_by(Technician.nama).all()
+    technicians = Technician.query.filter_by(team='Internal', status='Aktif').order_by(Technician.nama).all()
 
-    return render_template('attendance_report.html',
-                           records=records, month=month, year=year, technicians=technicians)
+    status_order = ['Hadir', 'Izin', 'Sakit', 'Alpa']
+    summary_by_technician = {}
+
+    for tech in technicians:
+        summary_by_technician[tech.id] = {
+            'technician': tech,
+            'Hadir': 0,
+            'Izin': 0,
+            'Sakit': 0,
+            'Alpa': 0,
+            'Total': 0,
+        }
+
+    for record in records:
+        tech_id = record.technician_id
+        if tech_id not in summary_by_technician:
+            continue
+
+        status_name = record.status or 'Alpa'
+        if status_name not in summary_by_technician[tech_id]:
+            summary_by_technician[tech_id][status_name] = 0
+
+        summary_by_technician[tech_id][status_name] += 1
+        summary_by_technician[tech_id]['Total'] += 1
+
+    attendance_summary = []
+    for tech in technicians:
+        summary = summary_by_technician.get(tech.id, {
+            'technician': tech,
+            'Hadir': 0,
+            'Izin': 0,
+            'Sakit': 0,
+            'Alpa': 0,
+            'Total': 0,
+        })
+        attendance_summary.append(summary)
+
+    return render_template(
+        'attendance_report.html',
+        records=records,
+        month=month,
+        year=year,
+        technicians=technicians,
+        attendance_summary=attendance_summary,
+        status_order=status_order,
+    )
 
 
 # 🔹 Hapus Absen
@@ -4133,9 +5269,6 @@ def api_employee(id):
         'nama': emp.nama,
         'gaji_pokok': emp.gaji_pokok or 0
     })
-
-
-from datetime import datetime
 
 @app.route('/employees/add', methods=['GET', 'POST'])
 @login_required
@@ -4562,7 +5695,6 @@ def percent(value):
     except Exception:
         return "0%"
 
-from collections import defaultdict
 import numpy as np
 
 @app.route("/analytics/cuci")
@@ -4778,6 +5910,683 @@ def seed_defaults():
             Technician(nama='Sari', team='Internal')
         ])
     db.session.commit()
+
+
+def money_value(raw_value, default=0.0):
+    try:
+        cleaned = str(raw_value or '').replace('Rp', '').replace('.', '').replace(',', '.').strip()
+        return max(float(cleaned), 0.0)
+    except (TypeError, ValueError):
+        return default
+
+
+def selling_price_from_margin(cost, margin_percent):
+    cost = float(cost or 0) if isinstance(cost, (int, float)) else money_value(cost)
+    margin_percent = float(margin_percent or 0) if isinstance(margin_percent, (int, float)) else money_value(margin_percent)
+    if not cost or margin_percent >= 100:
+        return 0.0
+    return round(cost / (1 - (margin_percent / 100)), -3)
+
+
+def next_document_number(prefix, model):
+    today = date.today().strftime('%Y%m')
+    count = model.query.filter(model.nomor.like(f'{prefix}-{today}-%')).count() + 1
+    return f'{prefix}-{today}-{count:04d}'
+
+
+def seed_master_pricelist():
+    brands = [
+        ('Daikin', 'Jepang', 'https://www.daikin.co.id', '1 tahun sparepart, 3 tahun kompresor'),
+        ('Panasonic', 'Jepang', 'https://www.panasonic.com/id', '1 tahun sparepart, 3 tahun kompresor'),
+        ('LG', 'Korea Selatan', 'https://www.lg.com/id', '1 tahun sparepart, 10 tahun kompresor'),
+        ('Samsung', 'Korea Selatan', 'https://www.samsung.com/id', '1 tahun sparepart, 10 tahun kompresor'),
+        ('Sharp', 'Jepang', 'https://id.sharp', '1 tahun sparepart, 3 tahun kompresor'),
+        ('Gree', 'Tiongkok', 'https://www.gree.id', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Midea', 'Tiongkok', 'https://www.midea.com/id', '1 tahun sparepart, 5 tahun kompresor'),
+        ('AUX', 'Tiongkok', 'https://auxair.id', '1 tahun sparepart, 5 tahun kompresor'),
+        ('TCL', 'Tiongkok', 'https://www.tcl.com/id', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Polytron', 'Indonesia', 'https://polytron.co.id', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Aqua', 'Tiongkok', 'https://aquaelektronik.com', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Mitsubishi Electric', 'Jepang', 'https://mitsubishielectric.co.id', '1 tahun sparepart, 3 tahun kompresor'),
+        ('Mitsubishi Heavy Industries', 'Jepang', 'https://www.mhi.com', '1 tahun sparepart, 3 tahun kompresor'),
+        ('Toshiba', 'Jepang', 'https://www.toshiba-lifestyle.com/id', '1 tahun sparepart, 3 tahun kompresor'),
+        ('Hitachi', 'Jepang', 'https://www.hitachi-homeappliances.com/id', '1 tahun sparepart, 3 tahun kompresor'),
+        ('Hisense', 'Tiongkok', 'https://www.hisense.id', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Changhong', 'Tiongkok', 'https://www.changhong.com', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Akari', 'Indonesia', 'https://akari.co.id', '1 tahun sparepart, 3 tahun kompresor'),
+        ('Sanken', 'Indonesia', 'https://sanken.co.id', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Haier', 'Tiongkok', 'https://www.haier.com/id', '1 tahun sparepart, 10 tahun kompresor'),
+        ('York', 'Amerika Serikat', 'https://www.york.com', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Carrier', 'Amerika Serikat', 'https://www.carrier.com', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Trane', 'Amerika Serikat', 'https://www.trane.com', '1 tahun sparepart, 5 tahun kompresor'),
+        ('Blue Star', 'India', 'https://www.bluestarindia.com', '1 tahun sparepart, 5 tahun kompresor'),
+        ('General', 'Jepang', 'https://www.general-hvac.com', '1 tahun sparepart, 3 tahun kompresor')
+    ]
+    for nama, negara_asal, website, garansi in brands:
+        brand = ACBrand.query.filter_by(nama=nama).first()
+        if not brand:
+            brand = ACBrand(nama=nama)
+            db.session.add(brand)
+        brand.negara_asal = brand.negara_asal or negara_asal
+        brand.website = brand.website or website
+        brand.logo = brand.logo or f"https://logo.clearbit.com/{website.replace('https://www.', '').replace('https://', '')}"
+        brand.garansi = brand.garansi or garansi
+        brand.status = 'Aktif'
+    db.session.flush()
+
+    services = [
+        ('JSA-PASANG', 'Pasang AC Baru Split', 175000, 300000, 75000, 180, '30 hari jasa'),
+        ('JSA-BONGKAR', 'Bongkar AC Split', 50000, 100000, 30000, 60, 'Tidak ada'),
+        ('JSA-BP', 'Bongkar Pasang AC Split', 225000, 400000, 100000, 240, '30 hari jasa'),
+        ('JSA-RELOKASI', 'Relokasi AC Split', 275000, 500000, 125000, 300, '30 hari jasa'),
+        ('JSA-VAKUM', 'Vakum Sistem AC', 40000, 100000, 30000, 45, 'Tidak ada'),
+        ('JSA-FREON', 'Isi Freon R32 per PK', 110000, 225000, 60000, 90, '14 hari'),
+        ('JSA-LAS', 'Las Pipa Tembaga per Titik', 45000, 100000, 30000, 45, '30 hari jasa'),
+        ('JSA-BOCOR', 'Perbaikan Kebocoran AC', 175000, 350000, 100000, 180, '30 hari jasa'),
+        ('JSA-CUCI', 'Cuci AC Split', 35000, 75000, 30000, 45, '7 hari'),
+        ('JSA-SB', 'Service Besar AC', 125000, 275000, 75000, 150, '30 hari jasa'),
+        ('JSA-OH', 'Overhaul Unit AC', 300000, 650000, 175000, 360, '30 hari jasa'),
+        ('JSA-KAP', 'Penggantian Kapasitor', 40000, 100000, 30000, 45, '30 hari jasa'),
+        ('JSA-FAN', 'Penggantian Fan Motor', 125000, 275000, 75000, 120, '30 hari jasa'),
+        ('JSA-PCB', 'Penggantian PCB', 150000, 350000, 100000, 120, '30 hari jasa'),
+        ('JSA-KOMP', 'Penggantian Kompresor', 400000, 850000, 250000, 360, '30 hari jasa'),
+        ('JSA-CAS', 'Instalasi Cassette', 500000, 900000, 250000, 420, '30 hari jasa'),
+        ('JSA-FS', 'Instalasi Floor Standing', 450000, 850000, 225000, 360, '30 hari jasa'),
+        ('JSA-VRF', 'Instalasi VRF / VRV per Indoor', 750000, 1500000, 400000, 480, '30 hari jasa'),
+        ('JSA-TEST', 'Testing dan Commissioning', 100000, 250000, 75000, 90, '7 hari')
+    ]
+    for kode, nama, harga_modal, harga_jual, komisi, waktu, garansi in services:
+        service = CatalogService.query.filter_by(kode=kode).first()
+        if not service:
+            service = CatalogService(kode=kode, nama=nama)
+            db.session.add(service)
+        service.harga_modal = service.harga_modal or harga_modal
+        service.harga_jual = service.harga_jual or harga_jual
+        service.komisi_teknisi = service.komisi_teknisi or komisi
+        service.estimasi_waktu_menit = service.estimasi_waktu_menit or waktu
+        service.garansi = service.garansi or garansi
+        service.status = 'Aktif'
+
+    materials = [
+        ('Pipa Tembaga 1/4 inch', 'Pipa Tembaga', 'Kembla', 'meter', 36000, 50000, 30), ('Pipa Tembaga 3/8 inch', 'Pipa Tembaga', 'Kembla', 'meter', 52000, 70000, 30),
+        ('Pipa Tembaga 1/2 inch', 'Pipa Tembaga', 'Kembla', 'meter', 78000, 100000, 20), ('Pipa Tembaga 5/8 inch', 'Pipa Tembaga', 'Kembla', 'meter', 105000, 135000, 15),
+        ('Pipa Tembaga 3/4 inch', 'Pipa Tembaga', 'Kembla', 'meter', 145000, 185000, 10), ('Pipa Insulasi 1/4 inch', 'Isolasi', 'Thermaflex', 'meter', 7000, 12000, 50),
+        ('Pipa Insulasi 3/8 inch', 'Isolasi', 'Thermaflex', 'meter', 9000, 15000, 50), ('Pipa Insulasi 1/2 inch', 'Isolasi', 'Thermaflex', 'meter', 12000, 18000, 40),
+        ('Kabel NYM 2 x 1.5 mm', 'Kabel', 'Supreme', 'meter', 9500, 14500, 100), ('Kabel NYM 2 x 2.5 mm', 'Kabel', 'Supreme', 'meter', 16000, 23500, 100),
+        ('Kabel NYM 2 x 4 mm', 'Kabel', 'Supreme', 'meter', 25500, 36000, 50), ('Kabel NYM 3 x 1.5 mm', 'Kabel', 'Supreme', 'meter', 14000, 20000, 100),
+        ('Kabel NYM 3 x 2.5 mm', 'Kabel', 'Supreme', 'meter', 23000, 32000, 100), ('Kabel NYM 3 x 4 mm', 'Kabel', 'Supreme', 'meter', 36000, 48000, 50),
+        ('Kabel Interkoneksi 2 x 1.5 mm', 'Kabel Interkoneksi', 'Supreme', 'meter', 10000, 16000, 100), ('Kabel Interkoneksi 2 x 2.5 mm', 'Kabel Interkoneksi', 'Supreme', 'meter', 18500, 27000, 50),
+        ('Kabel Interkoneksi 3 x 1.5 mm', 'Kabel Interkoneksi', 'Supreme', 'meter', 14500, 21500, 100), ('Kabel Interkoneksi 3 x 2.5 mm', 'Kabel Interkoneksi', 'Supreme', 'meter', 24000, 34000, 50),
+        ('Kabel Interkoneksi 4 x 1.5 mm', 'Kabel Interkoneksi', 'Supreme', 'meter', 17000, 25000, 100), ('Kabel Interkoneksi 4 x 2.5 mm', 'Kabel Interkoneksi', 'Supreme', 'meter', 28500, 39000, 50),
+        ('Bracket Outdoor 0.5-1 PK', 'Bracket', 'Local', 'set', 65000, 95000, 10),
+        ('Bracket Outdoor 1.5-2 PK', 'Bracket', 'Local', 'set', 100000, 140000, 10), ('Bracket Cassette', 'Bracket', 'Local', 'set', 225000, 300000, 5),
+        ('Pipa Drain PVC 3/4 inch', 'Drain', 'Wavin', 'meter', 7000, 12000, 50), ('Selang Drain Fleksibel', 'Drain', 'Local', 'meter', 4500, 8000, 50),
+        ('Duct PVC 65 x 65 mm', 'Duct', 'Eterna', 'meter', 30000, 45000, 30), ('Duct PVC 100 x 100 mm', 'Duct', 'Eterna', 'meter', 50000, 70000, 20),
+        ('MCB 6A 1P', 'MCB', 'Schneider', 'pcs', 45000, 65000, 10), ('MCB 10A 1P', 'MCB', 'Schneider', 'pcs', 50000, 75000, 10),
+        ('MCB 16A 1P', 'MCB', 'Schneider', 'pcs', 65000, 90000, 10), ('Stop Kontak AC 16A', 'Stop Kontak', 'Panasonic', 'pcs', 45000, 70000, 10),
+        ('Steker AC 16A', 'Steker', 'Panasonic', 'pcs', 25000, 40000, 10), ('Freon R32', 'Freon', 'Daikin', 'kg', 105000, 150000, 10),
+        ('Freon R410A', 'Freon', 'Honeywell', 'kg', 140000, 190000, 10), ('Freon R22', 'Freon', 'Chemours', 'kg', 95000, 140000, 10),
+        ('Conduit PVC 20 mm', 'Conduit', 'Eterna', 'meter', 8500, 14000, 50), ('Clamp Pipa 3/4 inch', 'Clamp', 'Local', 'pcs', 1000, 2000, 100),
+        ('Dynabolt M8', 'Dynabolt', 'Fischer', 'pcs', 3500, 6000, 50), ('Screw dan Fischer S8', 'Screw', 'Local', 'set', 1200, 2500, 100),
+        ('Duct Tape Aluminium', 'Duct Tape', 'Nitto', 'roll', 18000, 30000, 10), ('Cable Tray 100 mm', 'Cable Tray', 'Local', 'meter', 85000, 120000, 10),
+        ('Kabel Ties 30 cm', 'Aksesoris', 'Local', 'pack', 12000, 20000, 10), ('Baut Roof Rack', 'Aksesoris', 'Local', 'pcs', 4000, 7000, 50),
+        ('PVC Elbow 3/4 inch', 'PVC', 'Wavin', 'pcs', 3500, 6000, 50), ('PVC Socket 3/4 inch', 'PVC', 'Wavin', 'pcs', 2500, 4500, 50),
+        ('Lem PVC', 'PVC', 'Rucika', 'tube', 11000, 18000, 10), ('Peredam Getar Outdoor', 'Aksesoris', 'Local', 'set', 20000, 35000, 10),
+        ('Pompa Kondensat', 'Drain', 'Aspen', 'pcs', 450000, 600000, 2)
+    ]
+    for nama, kategori, merk, satuan, harga_modal, harga_jual, minimal_stok in materials:
+        material = Material.query.filter_by(nama=nama).first()
+        if not material:
+            material = Material(nama=nama, kategori=kategori)
+            db.session.add(material)
+        material.kategori = kategori
+        material.merk = merk
+        material.satuan = satuan
+        material.harga_modal = material.harga_modal or harga_modal
+        material.harga_jual = material.harga_jual or harga_jual
+        material.minimal_stok = material.minimal_stok or minimal_stok
+        material.lokasi_gudang = material.lokasi_gudang or 'Gudang Utama'
+        material.barcode = material.barcode or f"PAC-MAT-{re.sub(r'[^A-Z0-9]', '', nama.upper())[:70]}"
+        material.status = 'Aktif'
+
+    products = [
+        ('Daikin', 'FTC', 'FTC15NV14', 0.5, 'Standard', 'R32', 5000, 370, 1.8, 4200000), ('Panasonic', 'PU', 'PU9XKH', 1.0, 'Standard', 'R32', 9000, 790, 3.7, 4700000),
+        ('LG', 'DualCool', 'T10EV5', 1.0, 'Inverter', 'R32', 9000, 650, 3.1, 5400000), ('Samsung', 'WindFree', 'AR09CYFAAWKNSE', 1.0, 'Premium Inverter', 'R32', 9000, 700, 3.4, 5900000),
+        ('Sharp', 'AH-A', 'AH-A9BEY', 1.0, 'Low Watt', 'R32', 9000, 690, 3.3, 4400000), ('Gree', 'F5S', 'GWC-05F5S', 0.5, 'Standard', 'R32', 5000, 350, 1.6, 3000000),
+        ('Midea', 'M-Smart', 'MSAF-09CRN2', 1.0, 'Standard', 'R32', 9000, 800, 3.8, 3900000), ('AUX', 'A-Series', 'ASW-09A4', 1.0, 'Standard', 'R32', 9000, 780, 3.7, 3600000),
+        ('TCL', 'Elite', 'TAC-09CSD', 1.0, 'Inverter', 'R32', 9000, 690, 3.3, 4100000), ('Polytron', 'Neuva Pro', 'PAC-09VZ', 1.0, 'Low Watt', 'R32', 9000, 660, 3.1, 4000000),
+        ('Aqua', 'Turbo Cool', 'AQA-KCR9AHP', 1.0, 'Standard', 'R32', 9000, 780, 3.7, 3800000), ('Mitsubishi Electric', 'MS-JP', 'MS-JP09VF', 1.0, 'Inverter', 'R32', 9000, 710, 3.4, 7000000),
+        ('Mitsubishi Heavy Industries', 'SRK', 'SRK10CRS', 1.0, 'Inverter', 'R32', 9000, 720, 3.5, 7200000), ('Toshiba', 'U2KSG', 'RAS-10U2KSG', 1.0, 'Inverter', 'R32', 9000, 690, 3.3, 5600000),
+        ('Hitachi', 'Mokai', 'RAK-DJ10PH', 1.0, 'Inverter', 'R32', 9000, 700, 3.4, 6200000), ('Hisense', 'AN', 'AN09CEG', 1.0, 'Standard', 'R32', 9000, 780, 3.7, 3500000),
+        ('Changhong', 'CSC', 'CSC-09NVB', 1.0, 'Standard', 'R32', 9000, 800, 3.8, 3300000), ('Akari', 'AC', 'AC-09D3LW', 1.0, 'Low Watt', 'R32', 9000, 680, 3.2, 3400000),
+        ('Sanken', 'SAC', 'SAC-09DN', 1.0, 'Low Watt', 'R32', 9000, 670, 3.2, 3700000), ('Haier', 'CleanCool', 'HSU-09VQD03', 1.0, 'Inverter', 'R32', 9000, 680, 3.2, 4800000),
+        ('York', 'YWM', 'YWM10J', 1.0, 'Standard', 'R32', 9000, 800, 3.8, 5000000), ('Carrier', 'XPower', '42CVUR010', 1.0, 'Inverter', 'R32', 9000, 700, 3.4, 6500000),
+        ('Trane', 'TVR', 'TVR-S 1.5HP', 1.5, 'VRF', 'R410A', 12000, 1100, 5.2, 12000000), ('Blue Star', 'IC', 'IC312YATU', 1.5, 'Inverter', 'R32', 12000, 1050, 5.0, 6500000),
+        ('General', 'ASHG', 'ASHG09KPCA', 1.0, 'Inverter', 'R32', 9000, 680, 3.2, 6800000)
+    ]
+    for brand_name, seri, model, pk, jenis, refrigerant, btu, watt, ampere, harga_modal in products:
+        brand = ACBrand.query.filter_by(nama=brand_name).first()
+        pipa_gas = '3/8 inch' if pk <= 1 else '1/2 inch'
+        harga_jual = round(harga_modal * 1.22, -3)
+        product = ACProduct.query.filter_by(model=model).first()
+        if not product:
+            product = ACProduct(brand_id=brand.id, model=model)
+            db.session.add(product)
+        product.seri = product.seri or seri
+        product.pk = product.pk or pk
+        product.jenis = product.jenis if product.jenis not in (None, '', 'Standard') or jenis == 'Standard' else jenis
+        product.refrigerant = product.refrigerant or refrigerant
+        product.tegangan_nominal = product.tegangan_nominal or '220-240 Volt'
+        product.frekuensi_hz = product.frekuensi_hz or 50
+        product.kapasitas_btu = product.kapasitas_btu or btu
+        product.daya_watt = product.daya_watt or watt
+        product.arus_ampere = product.arus_ampere or ampere
+        product.eer = product.eer or round(btu / watt, 2)
+        product.cop = product.cop or round((btu * 0.293071) / watt, 2)
+        product.pipa_liquid = product.pipa_liquid or '1/4 inch'
+        product.pipa_gas = product.pipa_gas or pipa_gas
+        product.panjang_pipa_maksimum = product.panjang_pipa_maksimum or (15 if pk <= 1 else 20)
+        product.beda_tinggi_maksimum = product.beda_tinggi_maksimum or (7 if pk <= 1 else 10)
+        product.berat_indoor = product.berat_indoor or round(7.5 + pk * 1.5, 1)
+        product.berat_outdoor = product.berat_outdoor or round(20 + pk * 5, 1)
+        product.dimensi_indoor = product.dimensi_indoor or '790 x 200 x 275 mm'
+        product.dimensi_outdoor = product.dimensi_outdoor or '720 x 270 x 495 mm'
+        product.warna = product.warna or 'Putih'
+        product.made_in = product.made_in or 'Indonesia / Tiongkok'
+        product.garansi_kompresor = product.garansi_kompresor or '5 tahun'
+        product.garansi_sparepart = product.garansi_sparepart or '1 tahun'
+        product.harga_modal = product.harga_modal or harga_modal
+        product.harga_distributor = product.harga_distributor or round(harga_modal * 1.07, -3)
+        product.harga_dealer = product.harga_dealer or round(harga_modal * 1.13, -3)
+        product.harga_jual = product.harga_jual or harga_jual
+        product.status = 'Aktif'
+    db.session.commit()
+
+
+@app.route('/master-pricelist')
+@login_required
+def master_pricelist():
+    products = ACProduct.query.order_by(ACProduct.updated_at.desc()).all()
+    materials = Material.query.order_by(Material.kategori, Material.nama).all()
+    services = CatalogService.query.order_by(CatalogService.nama).all()
+    packages = InstallationPackage.query.order_by(InstallationPackage.nama).all()
+    quotations = Quotation.query.order_by(Quotation.created_at.desc()).limit(6).all()
+    brand_sales = (
+        db.session.query(ACBrand.nama, func.count(QuotationItem.id))
+        .select_from(ACBrand)
+        .join(ACProduct, ACProduct.brand_id == ACBrand.id)
+        .join(QuotationItem, QuotationItem.product_id == ACProduct.id)
+        .group_by(ACBrand.nama)
+        .all()
+    )
+    return render_template(
+        'master_pricelist.html', products=products, materials=materials, services=services, packages=packages,
+        brands=ACBrand.query.order_by(ACBrand.nama).all(), quotations=quotations,
+        metrics={
+            'products': len(products), 'brands': ACBrand.query.count(), 'materials': len(materials),
+            'quotation_total': sum(quotation.total for quotation in Quotation.query.all()),
+            'profit': sum(item.profit for quotation in Quotation.query.all() for item in quotation.items)
+        },
+        brand_sales_labels=[item[0] for item in brand_sales], brand_sales_values=[item[1] for item in brand_sales]
+    )
+
+
+@app.route('/master-pricelist/seed', methods=['POST'])
+@login_required
+def master_pricelist_seed():
+    seed_master_pricelist()
+    flash('Master merk, produk, jasa, dan material lengkap telah disiapkan atau dilengkapi.', 'success')
+    return redirect(url_for('master_pricelist'))
+
+
+@app.route('/master-pricelist/products', methods=['POST'])
+@login_required
+def product_create():
+    model = request.form.get('model', '').strip()
+    brand_id = request.form.get('brand_id', type=int)
+    if not model or not brand_id:
+        flash('Merk dan model produk wajib diisi.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    if ACProduct.query.filter_by(model=model).first():
+        flash('Model produk sudah terdaftar.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    harga_modal = money_value(request.form.get('harga_modal'))
+    harga_jual = money_value(request.form.get('harga_jual'))
+    if request.form.get('margin_persen') and harga_modal:
+        harga_jual = selling_price_from_margin(harga_modal, request.form.get('margin_persen'))
+    product = ACProduct(
+        brand_id=brand_id, model=model, seri=request.form.get('seri'), pk=money_value(request.form.get('pk')),
+        jenis=request.form.get('jenis') or 'Standard', refrigerant=request.form.get('refrigerant'),
+        tegangan_nominal=request.form.get('tegangan_nominal'), frekuensi_hz=money_value(request.form.get('frekuensi_hz')),
+        kapasitas_btu=money_value(request.form.get('kapasitas_btu')), daya_watt=money_value(request.form.get('daya_watt')),
+        arus_ampere=money_value(request.form.get('arus_ampere')), pipa_liquid=request.form.get('pipa_liquid'),
+        pipa_gas=request.form.get('pipa_gas'), harga_modal=harga_modal,
+        harga_distributor=money_value(request.form.get('harga_distributor')), harga_dealer=money_value(request.form.get('harga_dealer')),
+        harga_jual=harga_jual, status=request.form.get('status') or 'Aktif'
+    )
+    db.session.add(product)
+    db.session.commit()
+    flash('Produk AC berhasil ditambahkan.', 'success')
+    return redirect(url_for('master_pricelist'))
+
+
+@app.route('/master-pricelist/materials', methods=['POST'])
+@login_required
+def material_create():
+    nama = request.form.get('nama', '').strip()
+    kategori = request.form.get('kategori', '').strip()
+    if not nama or not kategori:
+        flash('Nama dan kategori material wajib diisi.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    barcode = request.form.get('barcode', '').strip() or None
+    if barcode and Material.query.filter_by(barcode=barcode).first():
+        flash('Barcode material sudah digunakan.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    db.session.add(Material(
+        nama=nama, kategori=kategori, merk=request.form.get('merk'), satuan=request.form.get('satuan') or 'pcs',
+        harga_modal=money_value(request.form.get('harga_modal')), harga_jual=money_value(request.form.get('harga_jual')),
+        supplier=request.form.get('supplier'), stok=money_value(request.form.get('stok')), minimal_stok=money_value(request.form.get('minimal_stok')),
+        lokasi_gudang=request.form.get('lokasi_gudang'), barcode=barcode, status=request.form.get('status') or 'Aktif'
+    ))
+    db.session.commit()
+    flash('Material berhasil ditambahkan.', 'success')
+    return redirect(url_for('master_pricelist'))
+
+
+@app.route('/master-pricelist/services', methods=['POST'])
+@login_required
+def catalog_service_create():
+    kode = request.form.get('kode', '').strip().upper()
+    nama = request.form.get('nama', '').strip()
+    if not kode or not nama or CatalogService.query.filter_by(kode=kode).first():
+        flash('Kode jasa wajib unik dan nama wajib diisi.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    db.session.add(CatalogService(
+        kode=kode, nama=nama, harga_modal=money_value(request.form.get('harga_modal')),
+        harga_jual=money_value(request.form.get('harga_jual')), komisi_teknisi=money_value(request.form.get('komisi_teknisi')),
+        estimasi_waktu_menit=request.form.get('estimasi_waktu_menit', type=int), garansi=request.form.get('garansi'), status='Aktif'
+    ))
+    db.session.commit()
+    flash('Jasa berhasil ditambahkan.', 'success')
+    return redirect(url_for('master_pricelist'))
+
+
+@app.route('/api/master-pricelist/<string:resource>', methods=['GET'])
+@login_required
+def master_pricelist_api(resource):
+    resources = {
+        'products': ACProduct.query.filter_by(status='Aktif').all(),
+        'materials': Material.query.filter_by(status='Aktif').all(),
+        'services': CatalogService.query.filter_by(status='Aktif').all(),
+        'packages': InstallationPackage.query.filter_by(status='Aktif').all()
+    }
+    if resource not in resources:
+        return jsonify({'error': 'Resource tidak ditemukan'}), 404
+    result = []
+    for item in resources[resource]:
+        result.append({
+            'id': item.id, 'name': getattr(item, 'model', None) or item.nama,
+            'price': item.total_jual if resource == 'packages' else getattr(item, 'harga_jual', 0),
+            'cost': item.total_modal if resource == 'packages' else getattr(item, 'harga_modal', 0),
+            'description': getattr(item, 'model', None) or item.nama,
+            'power_watt': getattr(item, 'daya_watt', None), 'current_ampere': getattr(item, 'arus_ampere', None),
+            'brand_id': item.brand_id if resource == 'products' else None,
+            'brand_name': item.brand.nama if resource == 'products' else None,
+            'pk': item.pk if resource == 'products' else None,
+            'ac_type': item.jenis if resource == 'products' else None,
+            'refrigerant': item.refrigerant if resource == 'products' else None,
+            'category': item.kategori if resource == 'materials' else None
+        })
+    return jsonify(result)
+
+
+@app.route('/master-pricelist/materials/import', methods=['POST'])
+@login_required
+def material_import():
+    uploaded_file = request.files.get('file')
+    if not uploaded_file or not uploaded_file.filename.endswith('.xlsx'):
+        flash('Pilih berkas Excel .xlsx.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    workbook = load_workbook(uploaded_file, read_only=True, data_only=True)
+    worksheet = workbook.active
+    headers = [str(cell.value or '').strip().lower() for cell in next(worksheet.iter_rows(min_row=1, max_row=1))]
+    required_headers = {'nama', 'kategori', 'satuan'}
+    if not required_headers.issubset(headers):
+        flash('Header Excel minimal: nama, kategori, satuan.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    created = 0
+    for row in worksheet.iter_rows(min_row=2, values_only=True):
+        values = dict(zip(headers, row))
+        nama = str(values.get('nama') or '').strip()
+        kategori = str(values.get('kategori') or '').strip()
+        if nama and kategori and not Material.query.filter_by(nama=nama).first():
+            db.session.add(Material(nama=nama, kategori=kategori, satuan=str(values.get('satuan') or 'pcs'),
+                                    harga_modal=money_value(values.get('harga_modal')), harga_jual=money_value(values.get('harga_jual'))))
+            created += 1
+    db.session.commit()
+    flash(f'{created} material baru diimpor.', 'success')
+    return redirect(url_for('master_pricelist'))
+
+
+@app.route('/master-pricelist/materials/export')
+@login_required
+def material_export():
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Material'
+    worksheet.append(['Nama', 'Kategori', 'Merk', 'Satuan', 'Harga Modal', 'Harga Jual', 'Supplier', 'Stok', 'Minimal Stok', 'Lokasi Gudang', 'Barcode', 'Status'])
+    for material in Material.query.order_by(Material.nama).all():
+        worksheet.append([material.nama, material.kategori, material.merk, material.satuan, material.harga_modal, material.harga_jual,
+                          material.supplier, material.stok, material.minimal_stok, material.lokasi_gudang, material.barcode, material.status])
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='master-material-perkasa-ac.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@app.route('/master-pricelist/materials/<int:id>/qr')
+@login_required
+def material_qr(id):
+    material = Material.query.get_or_404(id)
+    payload = f'MATERIAL:{material.id}|{material.barcode or material.nama}'
+    image = qrcode.make(payload)
+    output = io.BytesIO()
+    image.save(output, 'PNG')
+    output.seek(0)
+    return send_file(output, mimetype='image/png')
+
+
+def electrical_load(product, quantity, voltage, operating_hours, tariff):
+    total_power = (product.daya_watt or 0) * quantity
+    current = total_power / voltage if voltage else 0
+    recommended_mcb = next((rating for rating in [6, 10, 16, 20, 25, 32, 40, 50, 63] if rating >= current * 1.25), 63)
+    cable_size = '1.5 mm2' if current <= 10 else '2.5 mm2' if current <= 16 else '4 mm2' if current <= 25 else '6 mm2'
+    daily_kwh = (total_power / 1000) * operating_hours
+    monthly_kwh = daily_kwh * 30
+    load_percentage = (current / recommended_mcb * 100) if recommended_mcb else 0
+    advice = 'Gunakan mode eco dan set suhu 24-26 C.' if product.jenis == 'Inverter' else 'Pertimbangkan AC inverter dan jadwalkan pembersihan filter rutin.'
+    return {'total_power_watt': total_power, 'current_ampere': round(current, 2), 'recommended_mcb_ampere': recommended_mcb,
+            'cable_size': cable_size, 'daily_kwh': round(daily_kwh, 2), 'monthly_kwh': round(monthly_kwh, 2),
+            'monthly_cost': round(monthly_kwh * tariff, 2), 'annual_cost': round(monthly_kwh * tariff * 12, 2),
+            'load_percentage': round(load_percentage, 1), 'advice': advice}
+
+
+@app.route('/master-pricelist/load-calculator', methods=['GET', 'POST'])
+@login_required
+def load_calculator():
+    calculation = None
+    product_id = request.values.get('product_id', type=int)
+    if product_id:
+        product = ACProduct.query.get_or_404(product_id)
+        if request.method == 'POST':
+            calculation = electrical_load(product, request.form.get('quantity', type=int) or 1,
+                                           money_value(request.form.get('voltage')) or 220,
+                                           money_value(request.form.get('operating_hours')) or 8,
+                                           money_value(request.form.get('tariff')) or 1444.7)
+    return render_template('load_calculator.html', products=ACProduct.query.filter_by(status='Aktif').order_by(ACProduct.model).all(),
+                           product_id=product_id, calculation=calculation)
+
+
+@app.route('/api/master-pricelist/load-calculator', methods=['POST'])
+@login_required
+def load_calculator_api():
+    data = request.get_json(silent=True) or {}
+    product = ACProduct.query.get_or_404(data.get('product_id'))
+    return jsonify(electrical_load(product, int(data.get('quantity', 1)), float(data.get('voltage', 220)),
+                                  float(data.get('operating_hours', 8)), float(data.get('tariff', 1444.7))))
+
+
+@app.route('/quotations', methods=['GET', 'POST'])
+@login_required
+def quotations():
+    if request.method == 'POST':
+        customer_id = request.form.get('customer_id', type=int)
+        selected_items = request.form.getlist('catalog_item')
+        selected_products = request.form.getlist('product_selection')
+        selected_items.extend(f'products:{product_id}:{quantity}' for product_id, quantity in
+                              (selection.split(':', 1) for selection in selected_products))
+        if not customer_id or not selected_items:
+            flash('Customer dan minimal satu item wajib dipilih.', 'danger')
+            return redirect(url_for('quotations'))
+        customer = Customer.query.get_or_404(customer_id)
+        quotation = Quotation(nomor=next_document_number('SPH', Quotation), customer_id=customer.id,
+                              alamat=request.form.get('alamat') or customer.alamat, pic=request.form.get('pic'),
+                              berlaku_sampai=datetime.strptime(request.form['berlaku_sampai'], '%Y-%m-%d').date() if request.form.get('berlaku_sampai') else None,
+                              diskon=money_value(request.form.get('diskon')), ppn_persen=money_value(request.form.get('ppn_persen')),
+                              catatan=request.form.get('catatan'), syarat_pembayaran=request.form.get('syarat_pembayaran'), garansi=request.form.get('garansi'))
+        db.session.add(quotation)
+        for token in selected_items:
+            try:
+                resource, item_id, quantity = token.split(':')
+                quantity = max(float(quantity), 1)
+                item_id = int(item_id)
+            except (TypeError, ValueError):
+                continue
+            model_map = {
+                'products': (ACProduct, 'Produk'),
+                'materials': (Material, 'Material'),
+                'services': (CatalogService, 'Jasa'),
+                'packages': (InstallationPackage, 'Paket')
+            }
+            if resource not in model_map:
+                continue
+            model, jenis_item = model_map[resource]
+            item = db.session.get(model, item_id)
+            if not item or item.status != 'Aktif':
+                continue
+            description = getattr(item, 'model', None) or item.nama
+            if resource == 'products':
+                description = f'{item.brand.nama} {item.model} - {item.pk:g} PK {item.jenis}'
+            quotation.items.append(QuotationItem(
+                jenis_item=jenis_item, deskripsi=description, quantity=quantity,
+                product_id=item.id if resource == 'products' else None, material_id=item.id if resource == 'materials' else None,
+                service_id=item.id if resource == 'services' else None,
+                package_id=item.id if resource == 'packages' else None,
+                harga_modal_snapshot=item.total_modal if resource == 'packages' else item.harga_modal,
+                harga_satuan=item.total_jual if resource == 'packages' else item.harga_jual
+            ))
+        db.session.commit()
+        return redirect(url_for('quotation_detail', id=quotation.id))
+    return render_template('quotation_form.html', quotations=Quotation.query.order_by(Quotation.created_at.desc()).all(),
+                           customers=Customer.query.order_by(Customer.nama).all())
+
+
+@app.route('/quotations/<int:id>')
+@login_required
+def quotation_detail(id):
+    company_key = request.args.get('company', 'perkasa')
+    company_profile = get_company_profile(company_key)
+    return render_template('quotation_print.html', quotation=Quotation.query.get_or_404(id), print_date=date.today(), company_profile=company_profile)
+
+
+@app.route('/quotations/<int:id>/excel')
+@login_required
+def quotation_excel(id):
+    quotation = Quotation.query.get_or_404(id)
+    company_profile = get_company_profile(request.args.get('company', 'perkasa'))
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Penawaran'
+    worksheet.append([company_profile['name'], 'Surat Penawaran', quotation.nomor])
+    worksheet.append(['Customer', quotation.customer.nama])
+    worksheet.append([])
+    worksheet.append(['Jenis', 'Deskripsi', 'Qty', 'Harga Satuan', 'Subtotal'])
+    for item in quotation.items:
+        worksheet.append([item.jenis_item, item.deskripsi, item.quantity, item.harga_satuan, item.subtotal])
+    worksheet.append(['', '', '', 'Grand Total', quotation.total])
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    safe_company = company_profile['name'].replace(' ', '_')
+    return send_file(output, as_attachment=True, download_name=f'{quotation.nomor}_{safe_company}.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@app.route('/quotations/<int:id>/pdf')
+@login_required
+def quotation_pdf(id):
+    quotation = Quotation.query.get_or_404(id)
+    company_profile = get_company_profile(request.args.get('company', 'perkasa'))
+    output = io.BytesIO()
+    styles = getSampleStyleSheet()
+    document = SimpleDocTemplate(output, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    rows = [['No', 'Jenis', 'Deskripsi', 'Qty', 'Harga', 'Jumlah']]
+    for number, item in enumerate(quotation.items, start=1):
+        rows.append([str(number), item.jenis_item, item.deskripsi, str(item.quantity),
+                     f'Rp {item.harga_satuan:,.0f}', f'Rp {item.subtotal:,.0f}'])
+    rows.extend([['', '', '', '', 'Subtotal', f'Rp {quotation.subtotal:,.0f}'],
+                 ['', '', '', '', 'Diskon', f'Rp {quotation.diskon:,.0f}'],
+                 ['', '', '', '', 'Grand Total', f'Rp {quotation.total:,.0f}']])
+    table = Table(rows, colWidths=[28, 55, 175, 35, 80, 85])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1769aa')), ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+        ('ALIGN', (3, 1), (-1, -1), 'RIGHT'), ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8f1f8')), ('FONTNAME', (4, -1), (-1, -1), 'Helvetica-Bold')
+    ]))
+    story = [
+        Paragraph(company_profile['name'], styles['Title']),
+        Paragraph('SURAT PENAWARAN', styles['Heading2']),
+        Paragraph(f'<b>{quotation.nomor}</b><br/>Customer: {quotation.customer.nama}<br/>Alamat: {quotation.alamat or quotation.customer.alamat or "-"}', styles['BodyText']),
+        Spacer(1, 16), table, Spacer(1, 16),
+        Paragraph(f'<b>Syarat Pembayaran:</b> {quotation.syarat_pembayaran or "-"}', styles['BodyText']),
+        Paragraph(f'<b>Garansi:</b> {quotation.garansi or "-"}', styles['BodyText'])
+    ]
+    document.build(story)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name=f'{quotation.nomor}.pdf', mimetype='application/pdf')
+
+
+@app.route('/quotations/<int:id>/word')
+@login_required
+def quotation_word(id):
+    quotation = Quotation.query.get_or_404(id)
+    company_profile = get_company_profile(request.args.get('company', 'perkasa'))
+    rows = ''.join(f'<tr><td>{index}</td><td>{item.jenis_item}</td><td>{item.deskripsi}</td><td>{item.quantity}</td><td>Rp {item.harga_satuan:,.0f}</td><td>Rp {item.subtotal:,.0f}</td></tr>' for index, item in enumerate(quotation.items, start=1))
+    document = f'''<html><head><meta charset="utf-8"><style>body{{font-family:Arial;color:#1f2937}}table{{border-collapse:collapse;width:100%}}th{{background:#1769aa;color:white}}th,td{{border:1px solid #cbd5e1;padding:7px;text-align:left}}</style></head><body><h1 style="color:#1769aa">{company_profile['name']}</h1><h2>SURAT PENAWARAN</h2><p><b>{quotation.nomor}</b><br>Customer: {quotation.customer.nama}<br>Alamat: {quotation.alamat or quotation.customer.alamat or '-'}</p><table><tr><th>No</th><th>Jenis</th><th>Deskripsi</th><th>Qty</th><th>Harga</th><th>Jumlah</th></tr>{rows}<tr><td colspan="5"><b>Grand Total</b></td><td><b>Rp {quotation.total:,.0f}</b></td></tr></table><p><b>Syarat Pembayaran:</b> {quotation.syarat_pembayaran or '-'}</p><p><b>Garansi:</b> {quotation.garansi or '-'}</p></body></html>'''
+    return Response(document, mimetype='application/msword', headers={'Content-Disposition': f'attachment; filename={quotation.nomor}.doc'})
+
+
+@app.route('/quotations/<int:id>/to-invoice', methods=['POST'])
+@login_required
+def quotation_to_invoice(id):
+    quotation = Quotation.query.get_or_404(id)
+    invoice = Invoice(customer_id=quotation.customer_id, tanggal=date.today(), total=quotation.total, spo=quotation.nomor)
+    db.session.add(invoice)
+    db.session.flush()
+    for item in quotation.items:
+        db.session.add(InvoiceItem(invoice_id=invoice.id, deskripsi=item.deskripsi, harga=item.harga_satuan))
+    quotation.status = 'Dikonversi'
+    db.session.commit()
+    flash('Penawaran berhasil dikonversi menjadi invoice dengan harga snapshot.', 'success')
+    return redirect(url_for('invoice_detail', id=invoice.id))
+
+
+@app.route('/master-pricelist/packages', methods=['POST'])
+@login_required
+def installation_package_create():
+    kode = request.form.get('kode', '').strip().upper()
+    nama = request.form.get('nama', '').strip()
+    if not kode or not nama or InstallationPackage.query.filter_by(kode=kode).first():
+        flash('Kode paket wajib unik dan nama wajib diisi.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    package = InstallationPackage(kode=kode, nama=nama, deskripsi=request.form.get('deskripsi'),
+                                  garansi=request.form.get('garansi'), status='Aktif')
+    db.session.add(package)
+    for token in request.form.getlist('package_component'):
+        try:
+            resource, item_id, quantity = token.split(':')
+            quantity = max(float(quantity), 1)
+            item_id = int(item_id)
+        except (TypeError, ValueError):
+            continue
+        if resource == 'materials':
+            item = db.session.get(Material, item_id)
+            if item and item.status == 'Aktif':
+                package.items.append(InstallationPackageItem(material_id=item.id, quantity=quantity))
+        elif resource == 'services':
+            item = db.session.get(CatalogService, item_id)
+            if item and item.status == 'Aktif':
+                package.items.append(InstallationPackageItem(service_id=item.id, quantity=quantity))
+    db.session.commit()
+    flash('Paket instalasi berhasil ditambahkan.', 'success')
+    return redirect(url_for('master_pricelist'))
+
+
+@app.route('/api/master-pricelist/<string:resource>', methods=['POST'])
+@login_required
+def master_pricelist_api_create(resource):
+    payload = request.get_json(silent=True) or {}
+    models = {'products': ACProduct, 'materials': Material, 'services': CatalogService, 'packages': InstallationPackage}
+    model = models.get(resource)
+    if not model:
+        return jsonify({'error': 'Resource tidak ditemukan'}), 404
+    required = {'products': ('brand_id', 'model'), 'materials': ('nama', 'kategori'), 'services': ('kode', 'nama'), 'packages': ('kode', 'nama')}[resource]
+    if any(not payload.get(field) for field in required):
+        return jsonify({'error': f"Field wajib: {', '.join(required)}"}), 400
+    try:
+        item = model(**{key: value for key, value in payload.items() if hasattr(model, key)})
+        db.session.add(item)
+        db.session.commit()
+        return jsonify({'id': item.id, 'message': 'Data dibuat'}), 201
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({'error': str(error)}), 400
+
+
+@app.route('/api/master-pricelist/<string:resource>/<int:id>', methods=['PATCH', 'DELETE'])
+@login_required
+def master_pricelist_api_detail(resource, id):
+    models = {'products': ACProduct, 'materials': Material, 'services': CatalogService, 'packages': InstallationPackage}
+    model = models.get(resource)
+    if not model:
+        return jsonify({'error': 'Resource tidak ditemukan'}), 404
+    item = db.session.get(model, id)
+    if not item:
+        return jsonify({'error': 'Data tidak ditemukan'}), 404
+    if request.method == 'DELETE':
+        item.status = 'Nonaktif'
+        db.session.commit()
+        return jsonify({'message': 'Data dinonaktifkan'})
+    payload = request.get_json(silent=True) or {}
+    if resource == 'products' and 'margin_persen' in payload:
+        cost = payload.get('harga_modal', item.harga_modal)
+        payload['harga_jual'] = selling_price_from_margin(cost, payload.pop('margin_persen'))
+    editable = {
+        'products': {'seri', 'model', 'pk', 'jenis', 'refrigerant', 'tegangan_nominal', 'kapasitas_btu', 'daya_watt', 'arus_ampere', 'harga_modal', 'harga_distributor', 'harga_dealer', 'harga_jual', 'status'},
+        'materials': {'nama', 'kategori', 'merk', 'satuan', 'harga_modal', 'harga_jual', 'supplier', 'stok', 'minimal_stok', 'lokasi_gudang', 'barcode', 'status'},
+        'services': {'nama', 'harga_modal', 'harga_jual', 'komisi_teknisi', 'estimasi_waktu_menit', 'garansi', 'status'},
+        'packages': {'nama', 'deskripsi', 'garansi', 'status'}
+    }[resource]
+    for field, value in payload.items():
+        if field in editable:
+            setattr(item, field, value)
+    db.session.commit()
+    return jsonify({'id': item.id, 'message': 'Data diperbarui'})
+
+
+@app.route('/material-estimates', methods=['GET', 'POST'])
+@login_required
+def material_estimates():
+    if request.method == 'POST':
+        estimate = MaterialEstimate(nomor=next_document_number('EST', MaterialEstimate),
+                                    customer_id=request.form.get('customer_id', type=int),
+                                    panjang_pipa=money_value(request.form.get('panjang_pipa')),
+                                    jumlah_unit=request.form.get('jumlah_unit', type=int) or 1,
+                                    biaya_tambahan=money_value(request.form.get('biaya_tambahan')), catatan=request.form.get('catatan'))
+        db.session.add(estimate)
+        for token in request.form.getlist('estimate_item'):
+            resource, item_id, quantity = token.split(':')
+            item = db.session.get(Material if resource == 'materials' else CatalogService, int(item_id))
+            estimate.items.append(MaterialEstimateItem(
+                jenis_item='Material' if resource == 'materials' else 'Jasa', deskripsi=item.nama, quantity=max(float(quantity), 1),
+                harga_modal_snapshot=item.harga_modal, harga_jual_snapshot=item.harga_jual,
+                material_id=item.id if resource == 'materials' else None, service_id=item.id if resource == 'services' else None
+            ))
+        db.session.commit()
+        flash(f'Estimasi {estimate.nomor} berhasil disimpan.', 'success')
+        return redirect(url_for('material_estimates'))
+    return render_template('material_estimates.html', estimates=MaterialEstimate.query.order_by(MaterialEstimate.created_at.desc()).all(),
+                           customers=Customer.query.order_by(Customer.nama).all())
 
 if __name__ == '__main__':
     with app.app_context():

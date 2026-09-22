@@ -1,0 +1,249 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<style>
+  :root { --erp-blue:#1769aa; --erp-ink:#1f2937; --erp-mint:#e8f5ef; --erp-line:#dce4ed; }
+  .erp-page { color:var(--erp-ink); }
+  .erp-heading { font-weight:700; }
+  .metric { border:1px solid var(--erp-line); border-radius:8px; background:#fff; min-height:104px; }
+  .metric .value { font-size:1.4rem; font-weight:700; color:var(--erp-blue); }
+  .tab-pane { padding-top:1.25rem; }
+  .table thead th { background:#edf3f8; color:#415466; font-size:.76rem; text-transform:uppercase; white-space:nowrap; }
+  .catalog-image { width:38px; height:38px; display:grid; place-items:center; background:var(--erp-mint); color:#24734e; border-radius:6px; }
+  .filter-bar { background:#f7fafc; border:1px solid var(--erp-line); border-radius:6px; }
+  .form-label { font-size:.8rem; font-weight:600; margin-bottom:.25rem; }
+  .action-button { width:32px; height:32px; padding:0; display:inline-grid; place-items:center; }
+  .table-empty { padding:2.5rem!important; color:#66788a; text-align:center; }
+  .status-toggle { min-width:82px; }
+  .package-dashboard { color:#16324f; }
+  .package-stat { min-height:86px; border:1px solid var(--erp-line); border-radius:8px; padding:12px; background:#fff; }
+  .package-stat .number { font-size:1.35rem; font-weight:800; color:var(--erp-blue); }
+  .package-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(360px,1fr); gap:12px; }
+  .package-panel { border:1px solid var(--erp-line); border-radius:8px; background:#fff; overflow:hidden; }
+  .package-panel-header { padding:12px 14px; background:#f4f8fc; border-bottom:1px solid var(--erp-line); }
+  .package-list-row { display:grid; grid-template-columns:28px 1fr auto auto; gap:9px; align-items:center; padding:10px 12px; border-bottom:1px solid #edf2f7; cursor:pointer; }
+  .package-list-row:hover, .package-list-row.active { background:#edf5ff; }
+  .package-list-row .package-icon { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:#e6f0ff; color:#1769aa; }
+  .package-detail { padding:14px; }
+  .package-detail-tabs { display:flex; gap:4px; border-bottom:1px solid var(--erp-line); margin:0 -14px 12px; padding:0 14px; }
+  .package-detail-tab { border:0; background:transparent; padding:8px 11px; color:#60758b; font-size:.78rem; }
+  .package-detail-tab.active { color:#1769aa; border-bottom:2px solid #1769aa; font-weight:700; }
+  .package-components-table { width:100%; font-size:.76rem; }
+  .package-components-table th { background:#edf3f8; padding:7px; }
+  .package-components-table td { padding:7px; border-bottom:1px solid #edf2f7; }
+  .package-hidden-form { display:none!important; }
+  @media (max-width:900px) { .package-layout { grid-template-columns:1fr; } }
+</style>
+<main class="erp-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div><div class="text-primary small fw-semibold">OPERATIONS / CATALOG</div><h2 class="erp-heading mb-1">Master Pricelist AC</h2><p class="text-muted mb-0">Pusat produk, material, jasa, harga, dan margin proyek.</p></div>
+    <div class="d-flex gap-2"><a class="btn btn-outline-primary" href="{{ url_for('load_calculator') }}"><i class="bi bi-lightning-charge"></i> Beban Listrik</a><a class="btn btn-primary" href="{{ url_for('quotations') }}"><i class="bi bi-file-earmark-text"></i> Buat Penawaran</a></div>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg"><div class="metric p-3"><small class="text-muted">Produk</small><div class="value">{{ metrics.products }}</div></div></div><div class="col-6 col-lg"><div class="metric p-3"><small class="text-muted">Merk</small><div class="value">{{ metrics.brands }}</div></div></div><div class="col-6 col-lg"><div class="metric p-3"><small class="text-muted">Material</small><div class="value">{{ metrics.materials }}</div></div></div><div class="col-6 col-lg"><div class="metric p-3"><small class="text-muted">Nilai Penawaran</small><div class="value">{{ metrics.quotation_total|rupiah }}</div></div></div><div class="col-12 col-lg"><div class="metric p-3"><small class="text-muted">Profit Snapshot</small><div class="value">{{ metrics.profit|rupiah }}</div></div></div>
+  </div>
+  <ul class="nav nav-tabs" role="tablist"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#produk">Produk AC</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#material">Material</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#jasa">Jasa</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#paket">Paket</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#analitik">Analitik</button></li></ul>
+  <div class="tab-content">
+    <section class="tab-pane fade show active" id="produk">
+      <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Katalog Produk AC</h5><form method="post" action="{{ url_for('master_pricelist_seed') }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-database-add"></i> Lengkapi Master</button></form></div>
+      <form class="row g-2 border rounded-2 p-3 bg-light mb-3" method="post" action="{{ url_for('product_create') }}"><div class="col-md-2"><label class="form-label">Merk</label><select name="brand_id" class="form-select" required><option value="">Pilih merk</option>{% for brand in brands %}<option value="{{ brand.id }}">{{ brand.nama }}</option>{% endfor %}</select></div><div class="col-md-2"><label class="form-label">Seri</label><input name="seri" class="form-control"></div><div class="col-md-2"><label class="form-label">Model</label><input name="model" class="form-control" required></div><div class="col-md-1"><label class="form-label">PK</label><input name="pk" type="number" step=".5" class="form-control"></div><div class="col-md-2"><label class="form-label">Jenis</label><select name="jenis" class="form-select"><option>Standard</option><option>Low Watt</option><option>Inverter</option><option>Premium Inverter</option><option>Cassette</option><option>Floor Standing</option><option>Ceiling Duct</option><option>VRF</option><option>VRV</option><option>Multi Split</option></select></div><div class="col-md-1"><label class="form-label">BTU/H</label><input name="kapasitas_btu" type="number" class="form-control"></div><div class="col-md-1"><label class="form-label">Watt</label><input name="daya_watt" type="number" class="form-control"></div><div class="col-md-1"><label class="form-label">Jual</label><input name="harga_jual" type="number" class="form-control"></div><div class="col-md-3"><label class="form-label">Refrigerant / Tegangan</label><div class="input-group"><input name="refrigerant" placeholder="R32" class="form-control"><input name="tegangan_nominal" placeholder="220-240 V" class="form-control"></div></div><div class="col-md-2"><label class="form-label">Pipa Liquid / Gas</label><div class="input-group"><input name="pipa_liquid" placeholder="1/4" class="form-control"><input name="pipa_gas" placeholder="3/8" class="form-control"></div></div><div class="col-md-2"><label class="form-label">Harga Modal</label><input name="harga_modal" type="number" class="form-control"></div><div class="col-md-2"><label class="form-label">Distributor / Dealer</label><div class="input-group"><input name="harga_distributor" type="number" class="form-control"><input name="harga_dealer" type="number" class="form-control"></div></div><div class="col-md-1 d-flex align-items-end"><button class="btn btn-primary w-100" title="Tambah produk"><i class="bi bi-plus-lg"></i></button></div></form>
+      <div class="filter-bar p-2 mb-3 row g-2"><div class="col-lg-4"><input id="productSearch" class="form-control" placeholder="Cari merk, seri, atau model..."></div><div class="col-sm-4 col-lg-2"><select id="productBrand" class="form-select"><option value="">Semua merk</option>{% for brand in brands %}<option>{{ brand.nama }}</option>{% endfor %}</select></div><div class="col-sm-4 col-lg-2"><select id="productType" class="form-select"><option value="">Semua jenis</option>{% for product in products|map(attribute='jenis')|unique|sort %}<option>{{ product }}</option>{% endfor %}</select></div><div class="col-sm-4 col-lg-2"><select id="productPk" class="form-select"><option value="">Semua PK</option>{% for product in products|map(attribute='pk')|unique|sort %}<option value="{{ product }}">{{ product }} PK</option>{% endfor %}</select></div><div class="col-lg-2"><select id="productStatus" class="form-select"><option value="">Semua status</option><option>Aktif</option><option>Nonaktif</option></select></div></div>
+      <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Produk</th><th>Jenis</th><th>PK</th><th>Spesifikasi</th><th>Modal</th><th>Harga Jual</th><th>Margin</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="productTable">{% for product in products %}<tr data-search="{{ product.brand.nama }} {{ product.seri }} {{ product.model }}" data-brand="{{ product.brand.nama }}" data-type="{{ product.jenis }}" data-pk="{{ product.pk }}" data-status="{{ product.status }}"><td><div class="d-flex gap-2"><div class="catalog-image"><i class="bi bi-wind"></i></div><div><b>{{ product.brand.nama }}</b><br><small>{{ product.seri or '-' }} / {{ product.model }}</small></div></div></td><td>{{ product.jenis }}</td><td>{{ product.pk or '-' }}</td><td><small>{{ product.kapasitas_btu or '-' }} BTU | {{ product.daya_watt or '-' }} W<br>{{ product.refrigerant or '-' }} | {{ product.tegangan_nominal or '-' }}</small></td><td>{{ product.harga_modal|rupiah }}</td><td>{{ product.harga_jual|rupiah }}</td><td><span class="badge bg-success">{{ product.margin_persen }}%</span></td><td><span class="badge {% if product.status == 'Aktif' %}bg-primary{% else %}bg-secondary{% endif %}">{{ product.status }}</span></td><td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-primary action-button edit-record" title="Edit produk" data-resource="products" data-id="{{ product.id }}" data-fields='{{ {"seri": product.seri, "model": product.model, "pk": product.pk, "jenis": product.jenis, "refrigerant": product.refrigerant, "tegangan_nominal": product.tegangan_nominal, "kapasitas_btu": product.kapasitas_btu, "daya_watt": product.daya_watt, "arus_ampere": product.arus_ampere, "harga_modal": product.harga_modal, "harga_distributor": product.harga_distributor, "harga_dealer": product.harga_dealer, "harga_jual": product.harga_jual, "status": product.status}|tojson|forceescape }}'><i class="bi bi-pencil"></i></button> <button type="button" class="btn btn-sm btn-outline-danger action-button delete-record" title="Nonaktifkan produk" data-resource="products" data-id="{{ product.id }}" data-name="{{ product.brand.nama }} {{ product.model }}"><i class="bi bi-trash"></i></button></td></tr>{% else %}<tr><td colspan="9" class="table-empty">Belum ada produk.</td></tr>{% endfor %}<tr class="d-none no-results"><td colspan="9" class="table-empty">Produk tidak ditemukan.</td></tr></tbody></table></div>
+    </section>
+    <section class="tab-pane fade" id="material"><div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Master Material</h5><a class="btn btn-sm btn-outline-success" href="{{ url_for('material_export') }}"><i class="bi bi-file-earmark-excel"></i> Export</a></div><form class="row g-2 border rounded-2 p-3 bg-light mb-3" method="post" action="{{ url_for('material_create') }}"><div class="col-md-3"><input name="nama" class="form-control" placeholder="Nama material" required></div><div class="col-md-2"><input name="kategori" class="form-control" placeholder="Kategori" required></div><div class="col-md-1"><input name="satuan" class="form-control" placeholder="Satuan" required></div><div class="col-md-2"><input name="harga_modal" type="number" class="form-control" placeholder="Harga modal"></div><div class="col-md-2"><input name="harga_jual" type="number" class="form-control" placeholder="Harga jual"></div><div class="col-md-1"><input name="stok" type="number" class="form-control" placeholder="Stok"></div><div class="col-md-1"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div></form><div class="filter-bar p-2 mb-3 row g-2"><div class="col-md-6"><input id="materialSearch" class="form-control" placeholder="Cari material, merk, atau barcode..."></div><div class="col-md-3"><select id="materialCategory" class="form-select"><option value="">Semua kategori</option>{% for material in materials|map(attribute='kategori')|unique|sort %}<option>{{ material }}</option>{% endfor %}</select></div><div class="col-md-3"><select id="materialStock" class="form-select"><option value="">Semua stok</option><option value="low">Stok minimum / habis</option><option value="available">Stok tersedia</option></select></div></div><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Material</th><th>Kategori</th><th>Stok</th><th>Modal</th><th>Jual</th><th>Barcode</th><th>QR</th><th>Aksi</th></tr></thead><tbody id="materialTable">{% for material in materials %}<tr data-search="{{ material.nama }} {{ material.merk }} {{ material.barcode }}" data-category="{{ material.kategori }}" data-stock="{% if material.stok <= material.minimal_stok %}low{% else %}available{% endif %}"><td>{{ material.nama }}<small class="d-block text-muted">{{ material.merk or '-' }} / {{ material.satuan }}</small></td><td>{{ material.kategori }}</td><td>{{ material.stok }}</td><td>{{ material.harga_modal|rupiah }}</td><td>{{ material.harga_jual|rupiah }}</td><td><code>{{ material.barcode or '-' }}</code></td><td><a href="{{ url_for('material_qr', id=material.id) }}" target="_blank" class="btn btn-sm btn-outline-dark action-button" title="Tampilkan QR"><i class="bi bi-qr-code"></i></a></td><td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-primary action-button edit-record" title="Edit material" data-resource="materials" data-id="{{ material.id }}" data-fields='{{ {"nama": material.nama, "kategori": material.kategori, "merk": material.merk, "satuan": material.satuan, "harga_modal": material.harga_modal, "harga_jual": material.harga_jual, "supplier": material.supplier, "stok": material.stok, "minimal_stok": material.minimal_stok, "lokasi_gudang": material.lokasi_gudang, "barcode": material.barcode, "status": material.status}|tojson|forceescape }}'><i class="bi bi-pencil"></i></button> <button type="button" class="btn btn-sm btn-outline-danger action-button delete-record" title="Nonaktifkan material" data-resource="materials" data-id="{{ material.id }}" data-name="{{ material.nama }}"><i class="bi bi-trash"></i></button></td></tr>{% endfor %}<tr class="d-none no-results"><td colspan="8" class="table-empty">Material tidak ditemukan.</td></tr></tbody></table></div></section>
+    <section class="tab-pane fade" id="jasa"><h5 class="mb-3">Master Jasa</h5><form class="row g-2 border rounded-2 p-3 bg-light mb-3" method="post" action="{{ url_for('catalog_service_create') }}"><div class="col-md-2"><input name="kode" class="form-control" placeholder="Kode" required></div><div class="col-md-3"><input name="nama" class="form-control" placeholder="Nama jasa" required></div><div class="col-md-2"><input name="harga_modal" type="number" class="form-control" placeholder="Harga modal"></div><div class="col-md-2"><input name="harga_jual" type="number" class="form-control" placeholder="Harga jual"></div><div class="col-md-2"><input name="komisi_teknisi" type="number" class="form-control" placeholder="Komisi teknisi"></div><div class="col-md-1"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div></form><div class="filter-bar p-2 mb-3 row g-2"><div class="col-md-8"><input id="serviceSearch" class="form-control" placeholder="Cari kode, nama jasa, atau garansi..."></div><div class="col-md-4"><select id="serviceStatus" class="form-select"><option value="">Semua status</option><option>Aktif</option><option>Nonaktif</option></select></div></div><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Kode</th><th>Jasa</th><th>Modal</th><th>Jual</th><th>Komisi</th><th>Margin</th><th>Aksi</th></tr></thead><tbody id="serviceTable">{% for service in services %}<tr data-search="{{ service.kode }} {{ service.nama }} {{ service.garansi }}" data-status="{{ service.status }}"><td><code>{{ service.kode }}</code></td><td>{{ service.nama }}<small class="d-block text-muted">{{ service.garansi or 'Tanpa data garansi' }}</small></td><td>{{ service.harga_modal|rupiah }}</td><td>{{ service.harga_jual|rupiah }}</td><td>{{ service.komisi_teknisi|rupiah }}</td><td>{{ service.margin_persen }}%</td><td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-primary action-button edit-record" title="Edit jasa" data-resource="services" data-id="{{ service.id }}" data-fields='{{ {"nama": service.nama, "harga_modal": service.harga_modal, "harga_jual": service.harga_jual, "komisi_teknisi": service.komisi_teknisi, "estimasi_waktu_menit": service.estimasi_waktu_menit, "garansi": service.garansi, "status": service.status}|tojson|forceescape }}'><i class="bi bi-pencil"></i></button> <button type="button" class="btn btn-sm btn-outline-danger action-button delete-record" title="Nonaktifkan jasa" data-resource="services" data-id="{{ service.id }}" data-name="{{ service.nama }}"><i class="bi bi-trash"></i></button></td></tr>{% endfor %}<tr class="d-none no-results"><td colspan="7" class="table-empty">Jasa tidak ditemukan.</td></tr></tbody></table></div></section>
+    <section class="tab-pane fade" id="paket"><h5 class="mb-3">Master Paket Instalasi</h5><form class="row g-2 border rounded-2 p-3 bg-light mb-3" method="post" action="{{ url_for('installation_package_create') }}"><div class="col-md-2"><input name="kode" class="form-control" placeholder="Kode paket" required></div><div class="col-md-3"><input name="nama" class="form-control" placeholder="Nama paket" required></div><div class="col-md-4"><input name="deskripsi" class="form-control" placeholder="Komponen instalasi"></div><div class="col-md-2"><input name="garansi" class="form-control" placeholder="Garansi"></div><div class="col-md-1"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div></form><div class="filter-bar p-2 mb-3"><input id="packageSearch" class="form-control" placeholder="Cari kode, nama, deskripsi, atau garansi paket..."></div><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Kode</th><th>Paket</th><th>Komponen</th><th>Garansi</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="packageTable">{% for package in packages %}<tr data-search="{{ package.kode }} {{ package.nama }} {{ package.deskripsi }} {{ package.garansi }}"><td><code>{{ package.kode }}</code></td><td>{{ package.nama }}</td><td>{{ package.items|length }} item</td><td>{{ package.garansi or '-' }}</td><td>{{ package.status }}</td><td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-primary action-button edit-record" title="Edit paket" data-resource="packages" data-id="{{ package.id }}" data-fields='{{ {"nama": package.nama, "deskripsi": package.deskripsi, "garansi": package.garansi, "status": package.status}|tojson|forceescape }}'><i class="bi bi-pencil"></i></button> <button type="button" class="btn btn-sm btn-outline-danger action-button delete-record" title="Nonaktifkan paket" data-resource="packages" data-id="{{ package.id }}" data-name="{{ package.nama }}"><i class="bi bi-trash"></i></button></td></tr>{% endfor %}<tr class="d-none no-results"><td colspan="6" class="table-empty">Paket tidak ditemukan.</td></tr></tbody></table></div></section>
+    <section class="tab-pane fade" id="analitik"><div class="row"><div class="col-lg-7"><h5>Merk dalam Penawaran</h5><canvas id="brandSalesChart" height="130"></canvas></div><div class="col-lg-5"><h5>Dokumen Terbaru</h5><table class="table"><tbody>{% for quotation in quotations %}<tr><td><a href="{{ url_for('quotation_detail', id=quotation.id) }}">{{ quotation.nomor }}</a><small class="d-block text-muted">{{ quotation.customer.nama }}</small></td><td class="text-end">{{ quotation.total|rupiah }}</td></tr>{% else %}<tr><td class="text-muted">Belum ada penawaran.</td></tr>{% endfor %}</tbody></table></div></div></section>
+  </div>
+</main>
+<div class="modal fade" id="editModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form id="editForm"><div class="modal-header"><h5 class="modal-title">Edit Data Master</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3" id="editFields"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary"><i class="bi bi-check-lg"></i> Simpan Perubahan</button></div></form></div></div></div>
+<script>
+const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+const labels = {seri:'Seri', model:'Model', pk:'PK', jenis:'Jenis', refrigerant:'Refrigerant', tegangan_nominal:'Tegangan Nominal', kapasitas_btu:'Kapasitas BTU/H', daya_watt:'Daya (W)', arus_ampere:'Arus (A)', harga_modal:'Harga Modal', harga_distributor:'Harga Distributor', harga_dealer:'Harga Dealer', harga_jual:'Harga Jual', margin_persen:'Margin (%)', nama:'Nama', kategori:'Kategori', merk:'Merk', satuan:'Satuan', supplier:'Supplier', stok:'Stok', minimal_stok:'Minimal Stok', lokasi_gudang:'Lokasi Gudang', barcode:'Barcode', komisi_teknisi:'Komisi Teknisi', estimasi_waktu_menit:'Estimasi Waktu (Menit)', garansi:'Garansi', deskripsi:'Deskripsi', status:'Status'};
+const numericFields = new Set(['pk','kapasitas_btu','daya_watt','arus_ampere','harga_modal','harga_distributor','harga_dealer','harga_jual','margin_persen','stok','minimal_stok','komisi_teknisi','estimasi_waktu_menit']);
+function text(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character])); }
+function applyFilter(tableId, predicate) { const table = document.getElementById(tableId); const rows = [...table.querySelectorAll('tr:not(.no-results)')]; let visible = 0; rows.forEach(row => { const matches = predicate(row); row.classList.toggle('d-none', !matches); if (matches) visible++; }); table.querySelector('.no-results')?.classList.toggle('d-none', visible !== 0); }
+function filterProducts() { const search = productSearch.value.toLowerCase(); applyFilter('productTable', row => row.dataset.search.toLowerCase().includes(search) && (!productBrand.value || row.dataset.brand === productBrand.value) && (!productType.value || row.dataset.type === productType.value) && (!productPk.value || row.dataset.pk === productPk.value) && (!productStatus.value || row.dataset.status === productStatus.value)); }
+[productSearch, productBrand, productType, productPk, productStatus].forEach(control => control.addEventListener('input', filterProducts));
+function filterMaterials() { const search = materialSearch.value.toLowerCase(); applyFilter('materialTable', row => row.dataset.search.toLowerCase().includes(search) && (!materialCategory.value || row.dataset.category === materialCategory.value) && (!materialStock.value || row.dataset.stock === materialStock.value)); }
+[materialSearch, materialCategory, materialStock].forEach(control => control.addEventListener('input', filterMaterials));
+function filterServices() { const search = serviceSearch.value.toLowerCase(); applyFilter('serviceTable', row => row.dataset.search.toLowerCase().includes(search) && (!serviceStatus.value || row.dataset.status === serviceStatus.value)); }
+[serviceSearch, serviceStatus].forEach(control => control.addEventListener('input', filterServices));
+packageSearch.addEventListener('input', () => applyFilter('packageTable', row => row.dataset.search.toLowerCase().includes(packageSearch.value.toLowerCase())));
+document.querySelectorAll('.edit-record').forEach(button => button.addEventListener('click', () => { const data = JSON.parse(button.dataset.fields); if (button.dataset.resource === 'products') data.margin_persen = marginFromPrice(Number(data.harga_modal || 0), Number(data.harga_jual || 0)).toFixed(2); const fields = document.getElementById('editFields'); document.getElementById('editForm').dataset.resource = button.dataset.resource; document.getElementById('editForm').dataset.id = button.dataset.id; fields.innerHTML = Object.entries(data).map(([key, value]) => key === 'status' ? `<div class="col-md-4"><label class="form-label">Status</label><select class="form-select" name="status"><option ${value === 'Aktif' ? 'selected' : ''}>Aktif</option><option ${value === 'Nonaktif' ? 'selected' : ''}>Nonaktif</option></select></div>` : `<div class="col-md-6"><label class="form-label">${labels[key] || key}</label><input class="form-control" name="${key}" type="${numericFields.has(key) ? 'number' : 'text'}" step="any" value="${text(value)}"></div>`).join(''); if (button.dataset.resource === 'products') attachMarginCalculator(fields); editModal.show(); }));
+document.getElementById('editForm').addEventListener('submit', async event => { event.preventDefault(); const form = event.currentTarget; const payload = Object.fromEntries(new FormData(form).entries()); for (const field of numericFields) if (payload[field] !== undefined) payload[field] = Number(payload[field] || 0); const response = await fetch(`/api/master-pricelist/${form.dataset.resource}/${form.dataset.id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); if (!response.ok) return alert((await response.json()).error || 'Data gagal diperbarui.'); window.location.reload(); });
+document.querySelectorAll('.delete-record').forEach(button => button.addEventListener('click', async () => { if (!confirm(`Nonaktifkan ${button.dataset.name}? Data historis tidak akan dihapus.`)) return; const response = await fetch(`/api/master-pricelist/${button.dataset.resource}/${button.dataset.id}`, {method:'DELETE'}); if (!response.ok) return alert((await response.json()).error || 'Data gagal dinonaktifkan.'); window.location.reload(); }));
+const chart = document.getElementById('brandSalesChart'); if (chart && window.Chart) new Chart(chart, {type:'bar', data:{labels:{{ brand_sales_labels|tojson }}, datasets:[{label:'Item penawaran', data:{{ brand_sales_values|tojson }}, backgroundColor:'#1769aa'}]}, options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+function priceFromMargin(cost, margin) { return margin >= 100 || !cost ? 0 : Math.round(cost / (1 - margin / 100)); }
+function marginFromPrice(cost, price) { return !price ? 0 : (price - cost) / price * 100; }
+function attachMarginCalculator(container) {
+  const cost = container.querySelector('[name="harga_modal"]');
+  const price = container.querySelector('[name="harga_jual"]');
+  const margin = container.querySelector('[name="margin_persen"]');
+  if (!cost || !price || !margin || margin.dataset.bound) return;
+  margin.dataset.bound = 'true';
+  const updatePrice = () => { price.value = priceFromMargin(Number(cost.value || 0), Number(margin.value || 0)); };
+  const updateMargin = () => { margin.value = marginFromPrice(Number(cost.value || 0), Number(price.value || 0)).toFixed(2); };
+  cost.addEventListener('input', updatePrice);
+  margin.addEventListener('input', updatePrice);
+  price.addEventListener('input', updateMargin);
+}
+const productCreateForm = document.querySelector('form[action="{{ url_for('product_create') }}"]');
+const createPrice = productCreateForm?.querySelector('[name="harga_jual"]');
+if (createPrice) {
+  const marginColumn = document.createElement('div');
+  marginColumn.className = 'col-md-1';
+  marginColumn.innerHTML = '<label class="form-label">Margin %</label><input name="margin_persen" type="number" min="0" max="99" step=".01" value="18.03" class="form-control">';
+  createPrice.closest('.col-md-1').insertAdjacentElement('afterend', marginColumn);
+  attachMarginCalculator(productCreateForm);
+}
+const packageForm = document.querySelector('form[action="{{ url_for('installation_package_create') }}"]');
+if (packageForm) {
+  const packageSources = {
+    materials: [{% for material in materials if material.status == 'Aktif' %}{id: {{ material.id }}, name: {{ material.nama|tojson }}, cost: {{ material.harga_modal or 0 }}, price: {{ material.harga_jual or 0 }}},{% endfor %}],
+    services: [{% for service in services if service.status == 'Aktif' %}{id: {{ service.id }}, name: {{ service.nama|tojson }}, cost: {{ service.harga_modal or 0 }}, price: {{ service.harga_jual or 0 }}},{% endfor %}]
+  };
+  const descriptionColumn = packageForm.querySelector('[name="deskripsi"]')?.closest('.col-md-4');
+  if (descriptionColumn) descriptionColumn.classList.add('d-none');
+  const picker = document.createElement('div');
+  picker.className = 'col-12';
+  picker.innerHTML = `<div class="border rounded p-3 bg-white"><div class="row g-2 align-items-end"><div class="col-md-3"><label class="form-label">Jenis Komponen</label><select id="packageComponentType" class="form-select"><option value="materials">Material</option><option value="services">Jasa</option></select></div><div class="col-md-6"><label class="form-label">Pilih dari Master</label><select id="packageComponentSelect" class="form-select"></select></div><div class="col-md-2"><label class="form-label">Qty</label><input id="packageComponentQty" type="number" min="1" step=".1" value="1" class="form-control"></div><div class="col-md-1"><button id="addPackageComponent" type="button" class="btn btn-outline-primary w-100" title="Tambah komponen"><i class="bi bi-plus-lg"></i></button></div></div><div id="packageComponents" class="mt-3"></div><div class="row g-2 mt-2"><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Modal</small><b id="packageCost" class="d-block">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Jual</small><b id="packageSell" class="d-block text-primary">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Profit</small><b id="packageProfit" class="d-block text-success">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Margin</small><b id="packageMargin" class="d-block">0%</b></div></div></div></div>`;
+  packageForm.insertBefore(picker, packageForm.lastElementChild);
+  const selectedComponents = [];
+  const componentType = picker.querySelector('#packageComponentType');
+  const componentSelect = picker.querySelector('#packageComponentSelect');
+  const componentQuantity = picker.querySelector('#packageComponentQty');
+  const componentList = picker.querySelector('#packageComponents');
+  const formatRupiah = value => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(value))}`;
+  const renderOptions = () => { componentSelect.innerHTML = packageSources[componentType.value].map(item => `<option value="${item.id}">${text(item.name)} (${formatRupiah(item.price)})</option>`).join('') || '<option value="">Data master belum tersedia</option>'; };
+  const renderComponents = () => {
+    componentList.innerHTML = selectedComponents.length ? `<table class="table table-sm mb-0"><thead><tr><th>Jenis</th><th>Komponen</th><th class="text-end">Qty</th><th class="text-end">Modal</th><th class="text-end">Jual</th><th></th></tr></thead><tbody>${selectedComponents.map((item, index) => `<tr><td>${item.resource === 'materials' ? 'Material' : 'Jasa'}</td><td>${text(item.name)}</td><td class="text-end">${item.quantity}</td><td class="text-end">${formatRupiah(item.cost * item.quantity)}</td><td class="text-end">${formatRupiah(item.price * item.quantity)}</td><td><button type="button" class="btn btn-sm btn-outline-danger remove-package-component" data-index="${index}" title="Hapus komponen"><i class="bi bi-x-lg"></i></button></td></tr>`).join('')}</tbody></table>` : '<small class="text-muted">Belum ada komponen.</small>';
+    packageForm.querySelectorAll('[name="package_component"]').forEach(input => input.remove());
+    selectedComponents.forEach(item => { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'package_component'; input.value = `${item.resource}:${item.id}:${item.quantity}`; packageForm.appendChild(input); });
+    const cost = selectedComponents.reduce((total, item) => total + item.cost * item.quantity, 0); const sell = selectedComponents.reduce((total, item) => total + item.price * item.quantity, 0); const profit = sell - cost;
+    picker.querySelector('#packageCost').textContent = formatRupiah(cost); picker.querySelector('#packageSell').textContent = formatRupiah(sell); picker.querySelector('#packageProfit').textContent = formatRupiah(profit); picker.querySelector('#packageMargin').textContent = sell ? `${(profit / sell * 100).toFixed(2)}%` : '0%';
+    componentList.querySelectorAll('.remove-package-component').forEach(button => button.addEventListener('click', () => { selectedComponents.splice(Number(button.dataset.index), 1); renderComponents(); }));
+  };
+  componentType.addEventListener('change', renderOptions);
+  picker.querySelector('#addPackageComponent').addEventListener('click', () => { const item = packageSources[componentType.value].find(source => source.id === Number(componentSelect.value)); if (!item) return; selectedComponents.push({...item, resource: componentType.value, quantity: Math.max(Number(componentQuantity.value) || 1, 1)}); renderComponents(); });
+  renderOptions(); renderComponents();
+}
+document.querySelectorAll('#packageTable tr:not(.no-results)').forEach((row, index) => {
+  const totals = [{% for package in packages %}{modal: {{ package.total_modal }}, jual: {{ package.total_jual }}, profit: {{ package.total_jual - package.total_modal }}, margin: {{ package.margin_persen }}},{% endfor %}][index];
+  if (!totals) return;
+  const componentCell = row.cells[2];
+  componentCell.insertAdjacentHTML('beforeend', `<small class="d-block text-muted">Modal ${new Intl.NumberFormat('id-ID').format(totals.modal)} | Jual ${new Intl.NumberFormat('id-ID').format(totals.jual)}</small><small class="d-block text-success">Profit ${new Intl.NumberFormat('id-ID').format(totals.profit)} (${totals.margin}%)</small>`);
+});
+
+// Keep the active catalog tab after create, edit, delete, or bulk actions.
+const catalogTabs = [...document.querySelectorAll('[data-bs-toggle="tab"][data-bs-target]')];
+const catalogTabKey = 'master-pricelist-active-tab';
+function rememberCatalogTab(target) { if (target) sessionStorage.setItem(catalogTabKey, target); }
+catalogTabs.forEach(tab => tab.addEventListener('shown.bs.tab', event => rememberCatalogTab(event.target.dataset.bsTarget)));
+const savedCatalogTab = sessionStorage.getItem(catalogTabKey);
+if (savedCatalogTab) {
+  const savedTab = document.querySelector(`[data-bs-target="${savedCatalogTab}"]`);
+  if (savedTab) bootstrap.Tab.getOrCreateInstance(savedTab).show();
+}
+document.querySelectorAll('.tab-pane form').forEach(form => form.addEventListener('submit', () => {
+  const activeTab = document.querySelector('.tab-pane.show.active');
+  rememberCatalogTab(activeTab ? `#${activeTab.id}` : null);
+}));
+document.querySelectorAll('.edit-record, .delete-record').forEach(button => button.addEventListener('click', () => {
+  const activeTab = document.querySelector('.tab-pane.show.active');
+  rememberCatalogTab(activeTab ? `#${activeTab.id}` : null);
+}));
+
+// Add row selection and bulk deactivation to every catalog table.
+const bulkTables = [
+  ['productTable', 'products', 'produk'],
+  ['materialTable', 'materials', 'material'],
+  ['serviceTable', 'services', 'jasa'],
+  ['packageTable', 'packages', 'paket']
+];
+bulkTables.forEach(([tableId, resource, label]) => {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const header = table.closest('table')?.querySelector('thead tr');
+  if (!header) return;
+  const selectHeader = document.createElement('th');
+  selectHeader.innerHTML = '<input type="checkbox" class="form-check-input bulk-select-all" title="Pilih semua">';
+  header.prepend(selectHeader);
+  table.querySelectorAll('tr:not(.no-results)').forEach(row => {
+    const cell = document.createElement('td');
+    const id = row.querySelector('.delete-record')?.dataset.id || row.querySelector('.edit-record')?.dataset.id;
+    cell.innerHTML = `<input type="checkbox" class="form-check-input bulk-select" value="${id || ''}">`;
+    row.prepend(cell);
+  });
+  const toolbar = document.createElement('div');
+  toolbar.className = 'd-flex justify-content-between align-items-center mb-2 gap-2';
+  toolbar.innerHTML = `<small class="text-muted bulk-count">0 ${label} dipilih</small><button type="button" class="btn btn-sm btn-outline-danger bulk-delete"><i class="bi bi-trash"></i> Hapus Terpilih</button>`;
+  table.closest('.table-responsive')?.before(toolbar);
+  const all = toolbar.previousElementSibling?.querySelector('.bulk-select-all') || header.querySelector('.bulk-select-all');
+  const count = toolbar.querySelector('.bulk-count');
+  const updateSelection = () => {
+    const selected = [...table.querySelectorAll('.bulk-select:checked')];
+    count.textContent = `${selected.length} ${label} dipilih`;
+    if (all) all.checked = selected.length > 0 && selected.length === table.querySelectorAll('.bulk-select').length;
+  };
+  all?.addEventListener('change', () => { table.querySelectorAll('.bulk-select').forEach(input => { input.checked = all.checked; }); updateSelection(); });
+  table.addEventListener('change', event => { if (event.target.classList.contains('bulk-select')) updateSelection(); });
+  toolbar.querySelector('.bulk-delete').addEventListener('click', async () => {
+    const selected = [...table.querySelectorAll('.bulk-select:checked')];
+    if (!selected.length) return alert(`Pilih minimal satu ${label}.`);
+    if (!confirm(`Nonaktifkan ${selected.length} ${label} terpilih? Data historis tidak akan dihapus.`)) return;
+    rememberCatalogTab(`#${table.closest('.tab-pane').id}`);
+    const results = await Promise.all(selected.map(input => fetch(`/api/master-pricelist/${resource}/${input.value}`, { method: 'DELETE' })));
+    if (results.some(response => !response.ok)) return alert('Sebagian data gagal dinonaktifkan.');
+    window.location.reload();
+  });
+});
+
+// Package tab dashboard view: keep the existing form and endpoints as the data layer.
+const packageTab = document.getElementById('paket');
+if (packageTab) {
+  const packageCreateForm = packageTab.querySelector('form[action="{{ url_for('installation_package_create') }}"]');
+  const packageTable = packageTab.querySelector('#packageTable')?.closest('.table-responsive');
+  const packageData = [{% for package in packages %}{id: {{ package.id }}, kode: {{ package.kode|tojson }}, nama: {{ package.nama|tojson }}, deskripsi: {{ (package.deskripsi or '')|tojson }}, garansi: {{ (package.garansi or '')|tojson }}, status: {{ package.status|tojson }}, total: {{ package.total_jual }}, modal: {{ package.total_modal }}, items: [{% for item in package.items %}{name: {{ (item.material.nama if item.material else item.service.nama if item.service else '-')|tojson }}, qty: {{ item.quantity }}, unit: {{ (item.material.satuan if item.material else 'Pekerjaan')|tojson }}, price: {{ (item.material.harga_jual if item.material else item.service.harga_jual if item.service else 0) }}}{% if not loop.last %},{% endif %}{% endfor %}]}{% if not loop.last %},{% endif %}{% endfor %}];
+  const rupiah = value => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(value || 0))}`;
+  const dashboard = document.createElement('div');
+  dashboard.className = 'package-dashboard';
+  dashboard.innerHTML = `
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-lg-3"><div class="package-stat"><small class="text-muted">Total Paket</small><div class="number">${packageData.length}</div><small>${packageData.filter(item => item.status === 'Aktif').length} aktif</small></div></div>
+      <div class="col-6 col-lg-3"><div class="package-stat"><small class="text-muted">Paket Aktif</small><div class="number text-success">${packageData.filter(item => item.status === 'Aktif').length}</div><small>siap dipakai</small></div></div>
+      <div class="col-6 col-lg-3"><div class="package-stat"><small class="text-muted">Paket Nonaktif</small><div class="number text-danger">${packageData.filter(item => item.status !== 'Aktif').length}</div><small>perlu ditinjau</small></div></div>
+      <div class="col-6 col-lg-3"><div class="package-stat"><small class="text-muted">Total Komponen</small><div class="number text-primary">${packageData.reduce((sum, item) => sum + item.items.length, 0)}</div><small>di semua paket</small></div></div>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mb-2"><div><h5 class="mb-0">Master Paket Pemasangan</h5><small class="text-muted">Kelola paket pemasangan AC beserta komponen yang termasuk di dalamnya.</small></div><button type="button" class="btn btn-primary btn-sm" id="showPackageForm"><i class="bi bi-plus-lg"></i> Tambah Paket</button></div>
+    <div class="package-layout">
+      <div class="package-panel"><div class="package-panel-header d-flex gap-2"><input id="packageDashboardSearch" class="form-control form-control-sm" placeholder="Cari nama atau kode paket..."><select id="packageDashboardFilter" class="form-select form-select-sm" style="max-width:120px"><option value="">Semua</option><option value="Aktif">Aktif</option><option value="Nonaktif">Nonaktif</option></select></div><div id="packageDashboardList"></div></div>
+      <div class="package-panel"><div id="packageDashboardDetail" class="package-detail"></div></div>
+    </div>`;
+  packageTab.querySelector('h5.mb-3')?.closest('section')?.querySelector('h5.mb-3')?.remove();
+  packageCreateForm?.classList.add('package-hidden-form');
+  packageTable?.classList.add('package-hidden-form');
+  packageTab.appendChild(dashboard);
+  const list = dashboard.querySelector('#packageDashboardList');
+  const detail = dashboard.querySelector('#packageDashboardDetail');
+  let selectedId = packageData[0]?.id;
+  function renderDetail() {
+    const item = packageData.find(packageItem => packageItem.id === selectedId);
+    if (!item) { detail.innerHTML = '<div class="text-muted">Belum ada paket. Klik Tambah Paket untuk membuat paket baru.</div>'; return; }
+    detail.innerHTML = `<div class="d-flex justify-content-between align-items-start"><div><small class="text-muted">Kode Paket</small><h5 class="mb-1">${item.kode}</h5><div>${item.nama}</div></div><span class="badge ${item.status === 'Aktif' ? 'bg-success' : 'bg-danger'}">${item.status}</span></div><div class="row g-2 mt-2"><div class="col-6"><small class="text-muted">Harga per Paket</small><strong class="d-block text-primary">${rupiah(item.total)}</strong></div><div class="col-6"><small class="text-muted">Margin Snapshot</small><strong class="d-block">${item.total ? ((item.total - item.modal) / item.total * 100).toFixed(1) : 0}%</strong></div></div><div class="package-detail-tabs"><button class="package-detail-tab active" type="button">Komponen Paket</button><button class="package-detail-tab" type="button">Keterangan</button></div><table class="package-components-table"><thead><tr><th>No</th><th>Nama Komponen</th><th>Qty</th><th>Satuan</th><th class="text-end">Harga</th></tr></thead><tbody>${item.items.length ? item.items.map((component, index) => `<tr><td>${index + 1}</td><td>${component.name}</td><td>${component.qty}</td><td>${component.unit}</td><td class="text-end">${rupiah(component.price * component.qty)}</td></tr>`).join('') : '<tr><td colspan="5" class="text-muted">Belum ada komponen.</td></tr>'}</tbody></table><div class="d-flex justify-content-between mt-3"><small class="text-muted">${item.deskripsi || 'Belum ada deskripsi paket.'}</small><button type="button" class="btn btn-sm btn-outline-primary edit-record" data-resource="packages" data-id="${item.id}" data-fields='${JSON.stringify({nama:item.nama,deskripsi:item.deskripsi,garansi:item.garansi,status:item.status}).replace(/'/g, '&apos;')}'><i class="bi bi-pencil"></i> Edit</button></div>`;
+    detail.querySelector('.edit-record')?.addEventListener('click', () => packageTable?.querySelector(`.edit-record[data-id="${item.id}"]`)?.click());
+  }
+  function renderList() {
+    const query = dashboard.querySelector('#packageDashboardSearch').value.toLowerCase();
+    const filter = dashboard.querySelector('#packageDashboardFilter').value;
+    const filtered = packageData.filter(item => `${item.kode} ${item.nama} ${item.deskripsi}`.toLowerCase().includes(query) && (!filter || item.status === filter));
+    list.innerHTML = filtered.length ? filtered.map(item => `<div class="package-list-row ${item.id === selectedId ? 'active' : ''}" data-id="${item.id}"><span class="package-icon"><i class="bi bi-box-seam"></i></span><div><strong>${item.nama}</strong><small class="d-block text-muted">${item.kode} | ${item.items.length} komponen</small></div><span class="badge ${item.status === 'Aktif' ? 'bg-success' : 'bg-danger'}">${item.status}</span><strong class="text-primary">${rupiah(item.total)}</strong></div>`).join('') : '<div class="p-4 text-center text-muted">Paket tidak ditemukan.</div>';
+    list.querySelectorAll('.package-list-row').forEach(row => row.addEventListener('click', () => { selectedId = Number(row.dataset.id); renderList(); renderDetail(); }));
+  }
+  dashboard.querySelector('#packageDashboardSearch').addEventListener('input', renderList);
+  dashboard.querySelector('#packageDashboardFilter').addEventListener('change', renderList);
+  dashboard.querySelector('#showPackageForm').addEventListener('click', () => { packageCreateForm?.classList.toggle('package-hidden-form'); packageCreateForm?.scrollIntoView({behavior:'smooth', block:'center'}); });
+  renderList();
+  renderDetail();
+}
+</script>
+{% endblock %}

@@ -8,79 +8,456 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background:#f5f7fb; min-height:100vh; padding-top:70px; }
-    .card-ghost { background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%); border-radius:12px; box-shadow: 0 6px 18px rgba(23,23,23,0.06); }
-    .brand { font-weight:700; letter-spacing:0.3px; }
+    :root {
+      --sidebar-bg: #132b43;
+      --sidebar-bg-dark: #0c1d2d;
+      --sidebar-active: #1e5a9c;
+      --brand-red: #d22d2d;
+      --bg-soft: #f3f5f8;
+      --card-bg: #ffffff;
+      --text: #27364a;
+      --muted: #6b7280;
+      --line: #dfe7f0;
+      --green: #1ca96a;
+      --red: #dc4a4a;
+      --blue: #1d6fd6;
+      --orange: #f1a10f;
+      --purple: #7b61ff;
+    }
 
-    
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg-soft);
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      padding-top: 0;
+    }
+
+    body.login-page {
+      background: #f2f4f8;
+    }
+
+    .sidebar-nav {
+      --sidebar-collapsed-width: 64px;
+      --sidebar-expanded-width: 250px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-collapsed-width);
+      background: linear-gradient(180deg, #0d1f3a 0%, #0b1a2d 100%);
+      border-right: 1px solid rgba(255,255,255,.08);
+      z-index: 1030;
+      padding: 12px 12px 16px;
+      box-shadow: 8px 0 26px rgba(10,17,29,.16);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      transition: width .22s ease, box-shadow .22s ease;
+    }
+
+    .sidebar-nav:hover,
+    .sidebar-nav:focus-within {
+      width: var(--sidebar-expanded-width);
+      box-shadow: 8px 0 30px rgba(10,17,29,.3);
+    }
+
+    .sidebar-nav .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 8px 10px;
+      margin: 16px 0 0;
+      border-top: 1px solid rgba(255,255,255,.12);
+      color: #fff !important;
+      text-decoration: none;
+      font-weight: 800;
+      letter-spacing: .2px;
+      font-size: 1.1rem;
+      min-height: 52px;
+      margin-top: auto;
+      white-space: nowrap;
+    }
+
+    .sidebar-brand-badge {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(77,164,255,.28), rgba(255,255,255,.08));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .sidebar-brand-badge img {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .top-toolbar {
+      position: fixed;
+      top: 0;
+      left: 64px;
+      right: 0;
+      height: 62px;
+      background: linear-gradient(90deg, #d62b2b 0%, #d5332d 32%, #b21414 100%);
+      box-shadow: 0 5px 18px rgba(92, 0, 0, 0.18);
+      z-index: 1015;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 18px;
+      gap: 12px;
+    }
+
+    .toolbar-search {
+      width: min(480px, 42vw);
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .toolbar-search input {
+      background: transparent;
+      border: 0;
+      outline: none;
+      color: #fff;
+      width: 100%;
+    }
+
+    .toolbar-search input::placeholder { color: rgba(255,255,255,.75); }
+
+    .toolbar-action {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.12);
+      display: grid;
+      place-items: center;
+      color: white;
+      border: 1px solid rgba(255,255,255,.15);
+    }
+
+    .toolbar-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 16px;
+      padding: 5px 10px 5px 6px;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .toolbar-user .avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.2);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+    }
+
+    .sidebar-nav .navbar-brand img {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: rgba(255,255,255,.1);
+      padding: 3px;
+    }
+
+    .sidebar-nav .navbar-collapse {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .sidebar-nav .navbar-nav {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      gap: 2px;
+    }
+
+    .sidebar-nav .nav-item,
+    .sidebar-nav .dropdown {
+      width: 100%;
+    }
+
+    .sidebar-nav .nav-link,
+    .sidebar-nav .dropdown-item {
+      color: rgba(228,236,244,.9);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 600;
+      transition: .2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      text-decoration: none;
+      line-height: 1.2;
+      letter-spacing: .1px;
+      position: relative;
+      min-height: 42px;
+      justify-content: flex-start;
+      white-space: nowrap;
+    }
+
+    .sidebar-nav .nav-link > i,
+    .sidebar-nav .dropdown-item > i {
+      margin-left: 0;
+    }
+
+    .sidebar-nav .nav-link,
+    .sidebar-nav .dropdown-item,
+    .sidebar-nav .navbar-brand {
+      min-width: 226px;
+    }
+
+    .sidebar-nav .nav-link:hover,
+    .sidebar-nav .nav-link.active,
+    .sidebar-nav .dropdown-item:hover,
+    .sidebar-nav .dropdown-item:focus {
+      color: #fff;
+      background: linear-gradient(90deg, rgba(103, 170, 255, 0.22), rgba(103, 170, 255, 0.08));
+      text-decoration: none;
+      transform: translateX(1px);
+    }
+
+    .sidebar-nav .nav-link.active {
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+    }
+
+    .sidebar-nav .nav-link i,
+    .sidebar-nav .dropdown-item i {
+      width: 18px;
+      text-align: center;
+      font-size: 1rem;
+      opacity: .92;
+      flex-shrink: 0;
+    }
+
+    .sidebar-nav .dropdown-menu {
+      background: rgba(12, 23, 39, 0.95);
+      border: 0;
+      border-radius: 10px;
+      padding: 8px 6px 8px 10px;
+      margin: 4px 0 0 0;
+      min-width: 180px;
+      width: calc(100% - 8px);
+      box-shadow: none;
+      list-style: none;
+    }
+
+    .sidebar-nav .dropdown-item {
+      padding: 8px 10px;
+      color: #dbe8f8;
+      border-radius: 8px;
+      font-size: .95rem;
+      background: rgba(255,255,255,.02);
+    }
+
+    .sidebar-nav .dropdown-toggle {
+      justify-content: space-between;
+    }
+
+    .sidebar-nav .dropdown-toggle::after {
+      margin-left: auto;
+      opacity: .8;
+    }
+
+    .app-shell {
+      margin-left: 64px;
+      padding: 84px 18px 30px;
+      min-height: 100vh;
+      width: calc(100% - 64px);
+    }
+
+    .sidebar-nav ~ .app-shell,
+    .top-toolbar {
+      transition: margin-left .22s ease, left .22s ease;
+    }
+
+    .sidebar-nav:hover ~ .app-shell,
+    .sidebar-nav:focus-within ~ .app-shell {
+      margin-left: 64px;
+    }
+
+    .sidebar-nav:hover ~ .top-toolbar,
+    .sidebar-nav:focus-within ~ .top-toolbar {
+      left: 64px;
+    }
+
+    .sidebar-nav .navbar-collapse {
+      overflow: hidden;
+    }
+
+    .sidebar-nav:not(:hover):not(:focus-within) .nav-link,
+    .sidebar-nav:not(:hover):not(:focus-within) .navbar-brand {
+      min-width: 40px;
+      width: 40px;
+      padding-left: 11px;
+      padding-right: 11px;
+      gap: 0;
+    }
+
+    .sidebar-nav:not(:hover):not(:focus-within) .nav-link > i,
+    .sidebar-nav:not(:hover):not(:focus-within) .dropdown-item > i {
+      margin-right: 0;
+    }
+
+    .sidebar-nav:not(:hover):not(:focus-within) .nav-link,
+    .sidebar-nav:not(:hover):not(:focus-within) .navbar-brand,
+    .sidebar-nav:not(:hover):not(:focus-within) .nav-link::after {
+      color: transparent;
+    }
+
+    .sidebar-nav:not(:hover):not(:focus-within) .nav-link > i,
+    .sidebar-nav:not(:hover):not(:focus-within) .navbar-brand > .sidebar-brand-badge {
+      color: rgba(228,236,244,.9);
+    }
+
+    .sidebar-nav:not(:hover):not(:focus-within) .nav-link::after {
+      display: none;
+    }
+
+    .sidebar-nav:not(:hover):not(:focus-within) .dropdown-menu {
+      display: none !important;
+    }
+
+    .content-panel {
+      background: rgba(255,255,255,.16);
+      border-radius: 14px;
+      padding-top: 18px;
+    }
+
+    .container.app-shell {
+      max-width: none;
+    }
+
+    @media (max-width: 991.98px) {
+      .sidebar-nav {
+        position: static;
+        width: 100%;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+        overflow: visible;
+      }
+      .sidebar-nav:hover,
+      .sidebar-nav:focus-within {
+        width: 100%;
+      }
+      .app-shell {
+        margin-left: 0;
+        padding-top: 20px;
+        width: 100%;
+      }
+      .top-shell { display: none; }
+    }
+
+    .brand { font-weight: 700; letter-spacing: 0.3px; }
+    .card-ghost { background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%); border-radius:12px; box-shadow: 0 6px 18px rgba(23,23,23,0.06); }
   </style>
 </head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top border-bottom shadow-sm">
-  <div class="container-fluid">
-    <a class="navbar-brand brand" href="{{ url_for('dashboard') }}"><i class="bi bi-wind"></i> PERKASA AC</a>
+<body class="{% if not current_user.is_authenticated %}login-page{% endif %}">
+{% if current_user.is_authenticated %}
+<div class="top-toolbar">
+  <div class="toolbar-search">
+    <i class="bi bi-search"></i>
+    <input type="text" placeholder="Cari proyek, customer, invoice..." aria-label="Search" />
+  </div>
+  <div class="toolbar-action"><i class="bi bi-bell"></i></div>
+  <div class="toolbar-action"><i class="bi bi-gear"></i></div>
+  <div class="toolbar-user">
+    <div class="avatar">A</div>
+    <span>Hi, admin</span>
+  </div>
+</div>
+<nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top border-bottom shadow-sm sidebar-nav">
+  <div class="container-fluid p-0">
     <div class="collapse navbar-collapse">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('customers') }}">Customers</a></li>
-        <li class="nav-item">
-  <a class="nav-link" href="{{ url_for('reminders_auto') }}">
-    <i class="bi bi-bell"></i> Auto Reminders
-  </a>
-</li>
-<li class="nav-item dropdown">
-  <a class="nav-link dropdown-toggle" href="#" id="financeMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-    Laporan Keuangan
-  </a>
-  <ul class="dropdown-menu" aria-labelledby="financeMenu">
-    <li><a class="dropdown-item" href="{{ url_for('transactions') }}">📑 Transaksi</a></li>
-    <li><a class="dropdown-item" href="{{ url_for('laba_rugi') }}">📊 Laba Rugi Bulanan</a></li>
-    <li><a class="dropdown-item" href="{{ url_for('arus_kas') }}">💰 Arus Kas Bulanan</a></li>
-  </ul>
-</li>
-  <li class="nav-item dropdown">
-  <a class="nav-link dropdown-toggle" href="#" id="employeeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-    👥 Karyawan
-  </a>
-  <ul class="dropdown-menu" aria-labelledby="employeeDropdown">
-    <li><a class="dropdown-item" href="{{ url_for('employees') }}">Data Karyawan</a></li>
-    <li><a class="dropdown-item" href="{{ url_for('attendance_report') }}">Absensi</a></li>
-    <a class="dropdown-item" href="{{ url_for('kasbon_list') }}">Kasbon</a>
-    <li class="nav-item">
-      <a class="nav-link" href="{{ url_for('service_motor_list') }}">
-        <i class="bi bi-tools"></i> Service Motor
-      </a>
-    </li>
-
-    <li><a class="dropdown-item" href="{{ url_for('payroll_index') }}">💰 Gaji & Payroll</a></li>
-
-
-    
-  </ul>
-</li>
-
-
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('settings') }}">Settings</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('blast') }}">Blast</a></li>
-        <li class="nav-item">
-  <a class="nav-link" href="{{ url_for('analytics_cuci') }}">
-    📊 Analisa
-  </a>
-</li>
-
-
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-house-door"></i> Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('customers') }}"><i class="bi bi-people"></i> Customers</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('reminders_auto') }}"><i class="bi bi-bell"></i> Auto Reminders</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="financeMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-wallet2"></i> Laporan Keuangan
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="financeMenu">
+            <li><a class="dropdown-item" href="{{ url_for('projects') }}"><i class="bi bi-kanban"></i> Ringkasan Proyek</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('transactions') }}"><i class="bi bi-receipt"></i> Transaksi</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('transactions') }}"><i class="bi bi-cash-coin"></i> Pemasukan &amp; Pengeluaran</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('unpaid_list', tab='unpaid') }}"><i class="bi bi-exclamation-circle"></i> Piutang</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('laba_rugi') }}"><i class="bi bi-bar-chart"></i> Laba Rugi Bulanan</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('arus_kas') }}"><i class="bi bi-currency-dollar"></i> Arus Kas Bulanan</a></li>
+          </ul>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="employeeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-lines-fill"></i> Karyawan
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="employeeDropdown">
+            <li><a class="dropdown-item" href="{{ url_for('employees') }}"><i class="bi bi-people-fill"></i> Data Karyawan</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('attendance_report') }}"><i class="bi bi-calendar-check"></i> Absensi</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('kasbon_list') }}"><i class="bi bi-credit-card-2-front"></i> Kasbon</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('service_motor_list') }}"><i class="bi bi-bicycle"></i> Service Motor</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('payroll_index') }}"><i class="bi bi-bank"></i> Gaji &amp; Payroll</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('master_pricelist') }}"><i class="bi bi-journal-bookmark"></i> Master Pricelist</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.path.startswith('/documents') %}active{% endif %}" href="#" id="documentMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-folder2-open"></i> Dokumen
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="documentMenu">
+            <li><a class="dropdown-item" href="{{ url_for('documents') }}"><i class="bi bi-file-earmark-arrow-up"></i> Dokumen</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('documents_history') }}"><i class="bi bi-clock-history"></i> Dokumen &amp; Riwayat</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('document_templates') }}"><i class="bi bi-file-earmark-richtext"></i> Template Dokumen</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('documents_archive') }}"><i class="bi bi-archive"></i> Arsip Dokumen</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('quotations') }}"><i class="bi bi-file-earmark-text"></i> Penawaran</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('settings') }}"><i class="bi bi-gear"></i> Settings</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('analytics_cuci') }}"><i class="bi bi-graph-up"></i> Analisa</a></li>
       </ul>
 
-      <div class="d-flex align-items-center">
-        {% if current_user.is_authenticated %}
-        <div class="me-3 text-muted">Hi, {{ current_user.username }}</div>
-        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Logout</a>
-        {% endif %}
-      </div>
+      <a class="navbar-brand brand d-flex align-items-center gap-2" href="{{ url_for('dashboard') }}">
+        <span class="sidebar-brand-badge">
+          <img src="{{ url_for('static', filename=company_profile.logo) }}" alt="{{ company_profile.name }}">
+        </span>
+        <span>{{ company_profile.name }}</span>
+      </a>
     </div>
   </div>
 </nav>
-<div class="container mt-4">
+{% endif %}
+
+<div class="{% if current_user.is_authenticated %}container app-shell{% else %}login-full{% endif %}">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for cat,msg in messages %}
@@ -88,9 +465,97 @@
       {% endfor %}
     {% endif %}
   {% endwith %}
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
   {% block content %}{% endblock %}
 </div>
+{% if current_user.is_authenticated %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endif %}
+<script>
+
+const ctx = document.getElementById('revenueChart');
+
+if (ctx) new Chart(ctx,{
+
+type:'line',
+
+data:{
+
+labels:[
+'Jan',
+'Feb',
+'Mar',
+'Apr',
+'Mei',
+'Jun',
+'Jul',
+'Agu',
+'Sep',
+'Okt',
+'Nov',
+'Des'
+],
+
+datasets:[{
+
+label:'Pendapatan',
+
+data:[
+
+12,
+
+18,
+
+15,
+
+22,
+
+30,
+
+28,
+
+34,
+
+29,
+
+41,
+
+38,
+
+45,
+
+50
+
+],
+
+borderWidth:4,
+
+fill:true,
+
+tension:.35
+
+}]
+
+},
+
+options:{
+
+plugins:{
+
+legend:{
+
+display:false
+
+}
+
+},
+
+responsive:true
+
+}
+
+});
+
+</script>
 </body>
 </html>

@@ -1,152 +1,243 @@
 {% extends "base_modern.html" %}
 {% block content %}
 
-<div class="container mt-4">
-  <div class="card border-0 shadow-sm">
-    <div class="card-body">
+<style>
+  .payroll-hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    padding: 30px;
+    color: white;
+    margin-bottom: 30px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+  }
+  .payroll-hero h1 {
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 2rem;
+  }
+  .payroll-hero p {
+    font-size: 1rem;
+    opacity: 0.95;
+    margin: 0;
+  }
+  .generate-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 30px;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .generate-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  }
+  .generate-card .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+    color: white;
+  }
+  .generate-card .card-header h6 {
+    margin: 0;
+    font-weight: 600;
+  }
+  .form-select, .form-control {
+    border-radius: 8px;
+    border: 1.5px solid #e0e0e0;
+    transition: all 0.3s;
+  }
+  .form-select:focus, .form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  .btn-generate {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  .btn-generate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    color: white;
+  }
+</style>
 
-```
-  <!-- HEADER -->
-  <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
-    <div>
-      <h4 class="fw-bold mb-1">
-        <i class="fa fa-wallet text-primary me-2"></i>
-        Payroll Karyawan
-      </h4>
-      <p class="text-muted mb-0">
-        Ringkasan dan pengelolaan gaji teknisi per periode
-      </p>
-    </div>
-
-    <div class="d-flex gap-2 flex-wrap">
-      <a href="{{ url_for('payroll_settings') }}" class="btn btn-light border btn-sm">
-        <i class="fa fa-gear me-1"></i> Pengaturan Payroll
+<div class="container-fluid">
+  <!-- HERO HEADER -->
+  <div class="payroll-hero">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h1>
+          <i class="fa fa-wallet me-3"></i>Manajemen Payroll
+        </h1>
+        <p>Kelola gaji dan tunjangan teknisi internal dengan mudah</p>
+      </div>
+      <a href="{{ url_for('payroll_settings') }}" class="btn btn-light" style="border-radius: 8px; padding: 10px 20px; font-weight: 600;">
+        <i class="fa fa-gear me-2"></i>Pengaturan
       </a>
-      <button type="button"
-              class="btn btn-primary btn-sm"
-              onclick="document.getElementById('generatePayrollCard').scrollIntoView({behavior:'smooth'})">
-        <i class="fa fa-plus me-1"></i> Generate Payroll
-      </button>
     </div>
   </div>
 
   <!-- GENERATE PAYROLL -->
-  <div id="generatePayrollCard" class="card border-0 shadow-sm mb-4">
-    <div class="card-body">
-      <h6 class="fw-semibold mb-3">
-        <i class="fa fa-cogs text-success me-1"></i>
-        Generate Payroll Baru
+  <div id="generatePayrollCard" class="card generate-card">
+    <div class="card-header">
+      <h6>
+        <i class="fa fa-cogs me-2"></i>Generate Payroll Baru
       </h6>
+    </div>
+    <div class="card-body" style="padding: 25px;">
+      <form action="{{ url_for('generate_payroll') }}" method="post" class="row g-3 align-items-end">
+        <div class="col-lg-4">
+          <label class="form-label fw-600 mb-2">Pilih Teknisi Internal</label>
+          <select name="employee_ids[]" class="form-select form-select-lg" multiple required style="min-height: 100px; border-radius: 10px;">
+            {% if technicians %}
+              {% for tech in technicians %}
+                <option value="{{ tech.id }}">{{ tech.nama }}</option>
+              {% endfor %}
+            {% else %}
+              <option disabled>Tidak ada teknisi Internal aktif</option>
+            {% endif %}
+          </select>
+          <small class="text-muted d-block mt-1">💡 Gunakan Ctrl+Click untuk pilih multiple</small>
+        </div>
 
-      <form action="{{ url_for('generate_payroll') }}" method="post" class="row g-2 align-items-end">
-
-        <div class="col-md-5">
-          <label class="form-label small text-muted">Pilih Teknisi</label>
-          <select name="employee_ids[]" class="form-select form-select-sm" multiple>
-            {% for tech in technicians %}
-              <option value="{{ tech.id }}">{{ tech.nama }}{% if tech.team %} ({{ tech.team }}){% endif %}</option>
+        <div class="col-lg-3">
+          <label class="form-label fw-600 mb-2">Periode Gaji</label>
+          <select name="periode" class="form-select form-select-lg" required style="border-radius: 10px;">
+            <option value="">-- Pilih Periode --</option>
+            {% for periode in valid_periods %}
+              <option value="{{ periode.value }}" {% if periode.value == current_periode %}selected{% endif %}>
+                {{ periode.display }}
+              </option>
             {% endfor %}
           </select>
+          <small class="text-muted d-block mt-1">📅 Hanya 4 bulan terakhir tersedia</small>
         </div>
 
-        <div class="col-md-3">
-          <label class="form-label small text-muted">Periode Gaji</label>
-          <input type="month" name="periode" class="form-control form-control-sm" required>
-        </div>
-
-        <div class="col-md-4">
-          <button type="submit" class="btn btn-success btn-sm w-100">
-            <i class="fa fa-calculator me-1"></i> Generate Payroll
+        <div class="col-lg-5">
+          <button type="submit" class="btn btn-generate btn-lg w-100">
+            <i class="fa fa-calculator me-2"></i>Generate Payroll
           </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- FILTER -->
-  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-    <span class="fw-semibold small text-muted">Filter Periode:</span>
-    <form method="get" class="d-flex gap-2 align-items-center">
-      <input type="month" name="periode" value="{{ request.args.get('periode', '') }}" class="form-control form-control-sm" style="max-width:180px;">
-      <button type="submit" class="btn btn-outline-primary btn-sm">Terapkan</button>
-      {% if request.args.get('periode') %}
-        <a href="{{ url_for('payroll_index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
-      {% endif %}
-    </form>
+  <!-- FILTER SECTION -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px;">
+    <div class="card-body" style="padding: 20px;">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <i class="fa fa-filter text-muted" style="font-size: 1.2rem;"></i>
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+          <select name="periode" class="form-control" style="border-radius: 8px; max-width: 220px; border: 1.5px solid #e0e0e0;">
+            <option value="">-- Semua Periode --</option>
+            {% for periode in valid_periods %}
+              <option value="{{ periode.value }}" {% if request.args.get('periode') == periode.value %}selected{% endif %}>
+                {{ periode.display }}
+              </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-primary" style="border-radius: 8px; font-weight: 600;">
+            <i class="fa fa-search me-2"></i>Filter
+          </button>
+          {% if request.args.get('periode') %}
+            <a href="{{ url_for('payroll_index') }}" class="btn btn-outline-secondary" style="border-radius: 8px;">
+              <i class="fa fa-undo me-2"></i>Reset
+            </a>
+          {% endif %}
+        </form>
+      </div>
+    </div>
   </div>
 
-  <!-- TABLE -->
+  <!-- DATA PAYROLL -->
   {% if payrolls %}
   {% set total = namespace(pendapatan=0, potongan=0, gaji_bersih=0) %}
 
-  <div class="table-responsive">
-    <table class="table table-hover align-middle text-nowrap">
-      <thead class="table-light text-center">
-        <tr>
-          <th>Periode</th>
-          <th>Teknisi</th>
-          <th>Status</th>
-          <th class="text-end">Pendapatan</th>
-          <th class="text-end">Potongan</th>
-          <th class="text-end">Gaji Bersih</th>
-          <th style="min-width:150px">Aksi</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for pay in payrolls %}
-          {% set total.pendapatan = total.pendapatan + (pay.total_pendapatan or 0) %}
-          {% set total.potongan = total.potongan + (pay.total_potongan or 0) %}
-          {% set total.gaji_bersih = total.gaji_bersih + (pay.gaji_bersih or 0) %}
+  <div class="card border-0 shadow-sm" style="border-radius: 16px; overflow: hidden;">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead style="background: linear-gradient(135deg, #f7f9fc 0%, #f0f3f8 100%);">
           <tr>
-            <td class="text-center">{{ pay.periode }}</td>
-            <td>{{ pay.employee.nama if pay.employee else '-' }}</td>
-            <td class="text-center">
-              {% if pay.status == 'Final' %}
-                <span class="badge bg-success">Final</span>
-              {% else %}
-                <span class="badge bg-warning text-dark">Draft</span>
-              {% endif %}
-            </td>
-            <td class="text-end">Rp {{ '{:,.0f}'.format(pay.total_pendapatan or 0) }}</td>
-            <td class="text-end text-danger">-Rp {{ '{:,.0f}'.format(pay.total_potongan or 0) }}</td>
-            <td class="text-end fw-bold text-success">Rp {{ '{:,.0f}'.format(pay.gaji_bersih or 0) }}</td>
-            <td class="text-center">
-              <div class="d-flex justify-content-center gap-1 flex-wrap">
-                <a href="{{ url_for('payroll_detail', id=pay.id) }}" class="btn btn-sm btn-outline-primary">Lihat</a>
-                {% if pay.status != 'Final' %}
-                  <form action="{{ url_for('payroll_final', id=pay.id) }}" method="post">
-                    <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Finalkan payroll ini?')">Final</button>
-                  </form>
-                {% else %}
-                  <button class="btn btn-sm btn-success" disabled>Final</button>
-                {% endif %}
-                <form action="{{ url_for('payroll_delete', id=pay.id) }}" method="post" onsubmit="return confirm('Hapus payroll ini?')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
-                </form>
-              </div>
-            </td>
+            <th style="font-weight: 600; padding: 18px; color: #333;">Periode</th>
+            <th style="font-weight: 600; padding: 18px; color: #333;">Teknisi</th>
+            <th style="font-weight: 600; padding: 18px; color: #333;">Status</th>
+            <th class="text-end" style="font-weight: 600; padding: 18px; color: #333;">Pendapatan</th>
+            <th class="text-end" style="font-weight: 600; padding: 18px; color: #333;">Potongan</th>
+            <th class="text-end" style="font-weight: 600; padding: 18px; color: #333;">Gaji Bersih</th>
+            <th class="text-center" style="font-weight: 600; padding: 18px; color: #333;">Aksi</th>
           </tr>
-        {% endfor %}
-      </tbody>
-      <tfoot class="table-light fw-bold">
-        <tr>
-          <td colspan="3" class="text-end">TOTAL</td>
-          <td class="text-end">Rp {{ '{:,.0f}'.format(total.pendapatan) }}</td>
-          <td class="text-end text-danger">-Rp {{ '{:,.0f}'.format(total.potongan) }}</td>
-          <td class="text-end text-success">Rp {{ '{:,.0f}'.format(total.gaji_bersih) }}</td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
+        </thead>
+        <tbody>
+          {% for pay in payrolls %}
+            {% set total.pendapatan = total.pendapatan + (pay.total_pendapatan or 0) %}
+            {% set total.potongan = total.potongan + (pay.total_potongan or 0) %}
+            {% set total.gaji_bersih = total.gaji_bersih + (pay.gaji_bersih or 0) %}
+            <tr style="border-bottom: 1px solid #f0f0f0; transition: background 0.2s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+              <td style="padding: 18px;">
+                <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.9rem;">{{ pay.periode }}</span>
+              </td>
+              <td style="padding: 18px;">{{ pay.employee.nama if pay.employee else '-' }}</td>
+              <td style="padding: 18px;">
+                {% if pay.status == 'Final' %}
+                  <span class="badge" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 6px 12px; font-size: 0.85rem; font-weight: 600;">✓ Final</span>
+                {% else %}
+                  <span class="badge" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 6px 12px; font-size: 0.85rem; font-weight: 600;">⟳ Draft</span>
+                {% endif %}
+              </td>
+              <td class="text-end" style="padding: 18px; font-weight: 600; color: #059669;">Rp {{ '{:,.0f}'.format(pay.total_pendapatan or 0) }}</td>
+              <td class="text-end" style="padding: 18px; font-weight: 600; color: #dc2626;">-Rp {{ '{:,.0f}'.format(pay.total_potongan or 0) }}</td>
+              <td class="text-end" style="padding: 18px; font-weight: 700; font-size: 1.1rem; color: #0d6efd;">Rp {{ '{:,.0f}'.format(pay.gaji_bersih or 0) }}</td>
+              <td class="text-center" style="padding: 18px;">
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                  <a href="{{ url_for('payroll_detail', id=pay.id) }}" class="btn btn-sm" style="border-radius: 6px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; font-weight: 600; padding: 6px 12px;" title="Lihat detail">
+                    <i class="fa fa-eye me-1"></i>Lihat
+                  </a>
+                  {% if pay.status != 'Final' %}
+                    <form action="{{ url_for('payroll_final', id=pay.id) }}" method="post" style="display: inline;">
+                      <button type="submit" class="btn btn-sm" style="border-radius: 6px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; font-weight: 600; padding: 6px 12px;" onclick="return confirm('Finalkan payroll ini?')" title="Finalkan payroll">
+                        <i class="fa fa-check me-1"></i>Final
+                      </button>
+                    </form>
+                    <form action="{{ url_for('payroll_delete', id=pay.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Hapus payroll ini? Tindakan ini tidak dapat dibatalkan.')">
+                      <button type="submit" class="btn btn-sm" style="border-radius: 6px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; font-weight: 600; padding: 6px 12px;" title="Hapus payroll">
+                        <i class="fa fa-trash me-1"></i>Hapus
+                      </button>
+                    </form>
+                  {% else %}
+                    <button class="btn btn-sm" style="border-radius: 6px; background: #d1d5db; color: #6b7280; border: none; font-weight: 600; padding: 6px 12px; cursor: not-allowed;" disabled>
+                      <i class="fa fa-check me-1"></i>Final
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot style="background: linear-gradient(135deg, #f7f9fc 0%, #f0f3f8 100%); border-top: 2px solid #e5e7eb;">
+          <tr>
+            <td colspan="3" class="text-end" style="padding: 18px; font-weight: 700; font-size: 1rem;">📊 TOTAL</td>
+            <td class="text-end" style="padding: 18px; font-weight: 700; font-size: 1rem; color: #059669;">Rp {{ '{:,.0f}'.format(total.pendapatan) }}</td>
+            <td class="text-end" style="padding: 18px; font-weight: 700; font-size: 1rem; color: #dc2626;">-Rp {{ '{:,.0f}'.format(total.potongan) }}</td>
+            <td class="text-end" style="padding: 18px; font-weight: 700; font-size: 1.1rem; color: #0d6efd;">Rp {{ '{:,.0f}'.format(total.gaji_bersih) }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
   {% else %}
-    <div class="alert alert-info text-center">Belum ada data payroll.</div>
+    <div class="alert" style="background: linear-gradient(135deg, #e0f2fe 0%, #ecfdf5 100%); border: 2px solid #06b6d4; border-radius: 12px; padding: 30px; text-align: center;">
+      <i class="fa fa-inbox" style="font-size: 2rem; color: #06b6d4; margin-bottom: 10px;"></i>
+      <h5 style="color: #0891b2; font-weight: 600; margin-top: 10px;">Belum ada data payroll</h5>
+      <p style="color: #06b6d4; margin-bottom: 0;">Mulai dengan membuat payroll baru menggunakan form di atas</p>
+    </div>
   {% endif %}
 
-</div>
-```
-
-  </div>
 </div>
 
 {% endblock %}

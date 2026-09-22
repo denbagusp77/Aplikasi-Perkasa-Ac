@@ -1,0 +1,44 @@
+{% extends 'base_modern.html' %}
+{% block content %}
+<div class="doc-page">
+  <div class="doc-topbar">
+    <div>
+      <p class="doc-subtitle">Dokumen &amp; Arsip</p>
+      <h1 class="doc-title">Arsip Dokumen</h1>
+    </div>
+    <a href="{{ url_for('documents') }}" class="btn btn-back">Kembali</a>
+  </div>
+
+  <div class="panel-card form-panel">
+    <div class="section-header"><i class="bi bi-archive"></i> Dokumen Arsip</div>
+    {% if documents %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th>Jenis</th>
+            <th>Status</th>
+            <th>Tanggal</th>
+            <th>File</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+          <tr>
+            <td>{{ doc.nama }}</td>
+            <td>{{ doc.jenis }}</td>
+            <td><span class="badge bg-warning-subtle text-warning">{{ doc.status }}</span></td>
+            <td>{{ doc.tanggal.strftime('%d-%m-%Y') }}</td>
+            <td><a href="{{ url_for('document_download', doc_id=doc.id) }}" class="btn btn-sm btn-outline-primary">Open</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">Arsip dokumen masih kosong.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

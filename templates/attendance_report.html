@@ -36,6 +36,40 @@
       </div>
     </form>
 
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-light fw-semibold">Ringkasan Status Per Karyawan</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Nama Karyawan</th>
+              <th class="text-center">Hadir</th>
+              <th class="text-center">Izin</th>
+              <th class="text-center">Sakit</th>
+              <th class="text-center">Alpa</th>
+              <th class="text-center">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in attendance_summary %}
+            <tr>
+              <td>{{ item.technician.nama }}</td>
+              <td class="text-center"><span class="badge bg-success">{{ item.Hadir }}</span></td>
+              <td class="text-center"><span class="badge bg-warning text-dark">{{ item.Izin }}</span></td>
+              <td class="text-center"><span class="badge bg-info text-dark">{{ item.Sakit }}</span></td>
+              <td class="text-center"><span class="badge bg-secondary">{{ item.Alpa }}</span></td>
+              <td class="text-center"><span class="badge bg-primary">{{ item.Total }}</span></td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted">Belum ada data karyawan untuk periode ini.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Tabel Data Absensi -->
     <div class="table-responsive">
       <table class="table table-hover align-middle">
@@ -65,12 +99,13 @@
                 <span class="badge bg-warning text-dark">Izin</span>
               {% elif r.status == 'Sakit' %}
                 <span class="badge bg-info text-dark">Sakit</span>
+              {% elif r.status == 'Alpa' %}
+                <span class="badge bg-secondary">Alpa</span>
               {% else %}
                 <span class="badge bg-secondary">{{ r.status or '-' }}</span>
               {% endif %}
             </td>
             <td>
-              <!-- Tombol Edit -->
               <button type="button"
                       class="btn btn-sm btn-outline-primary btn-edit-attendance"
                       data-id="{{ r.id }}"
@@ -83,7 +118,6 @@
                 <i class="bi bi-pencil"></i>
               </button>
 
-              <!-- Tombol Hapus -->
               <form action="{{ url_for('delete_attendance', id=r.id) }}"
                     method="POST"
                     style="display:inline;"

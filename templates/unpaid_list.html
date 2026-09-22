@@ -1,12 +1,86 @@
 {% extends 'base_modern.html' %}
 {% block content %}
-
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h3><i class="bi bi-exclamation-circle text-danger"></i> Data Belum Lunas</h3>
-  <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
-    <i class="bi bi-arrow-left"></i> Kembali
-  </a>
-</div>
+<style>
+  .page-shell {
+    background: #f5f7fb;
+    border: 1px solid #e2e8f0;
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  }
+  .page-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .tab-pill {
+    border: 1px solid #dfe7f1;
+    border-radius: 999px;
+    padding: 8px 16px;
+    background: #ffffff;
+    color: #475569;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+  .tab-pill.active {
+    background: #0f172a;
+    color: #fff;
+    border-color: #0f172a;
+  }
+  .list-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .list-row {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr 1.2fr 1fr 1.2fr 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #edf2f7;
+  }
+  .list-row:last-child {
+    border-bottom: none;
+  }
+  .list-header {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    font-weight: 800;
+    background: #f8fafc;
+  }
+  .badge-soft {
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+  .badge-soft.danger { background: #fee2e2; color: #b91c1c; }
+  .badge-soft.info { background: #dbeafe; color: #1d4ed8; }
+  @media (max-width: 900px) {
+    .list-row {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+<div class="page-shell">
+  <div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
+    <h3><i class="bi bi-exclamation-circle text-danger"></i> Data Belum Lunas</h3>
+    <div class="page-tabs" role="group" aria-label="Navigation tab unpaid">
+      <a href="{{ url_for('reminders_auto', tab='reminder') }}" class="tab-pill {% if active_tab == 'reminder' %}active{% endif %}">Reminder</a>
+      <a href="{{ url_for('unpaid_list', tab='unpaid') }}" class="tab-pill {% if active_tab == 'unpaid' %}active{% endif %}">Belum Lunas</a>
+      <a href="{{ url_for('claim_list_all', tab='claim') }}" class="tab-pill {% if active_tab == 'claim' %}active{% endif %}">Klaim</a>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+  </div>
 
 <form method="get" class="row g-2 mb-4 align-items-end">
   <div class="col-md-3">
@@ -55,45 +129,69 @@
     <span>Rp {{ "{:,.0f}".format(total_belum_lunas or 0) }}</span>
   </div>
 
-  <div class="table-responsive">
-    <table class="table table-striped align-middle shadow-sm">
-      <thead class="table-danger">
-        <tr>
-          <th>Tanggal</th>
-          <th>Customer</th>
-          <th>Unit</th>
-          <th>Teknisi</th>
-          <th>Jenis Service</th>
-          <th>Total</th>
-          <th>Status</th>
-          <th>Aksi</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in unpaid_services %}
-        <tr>
-          <td>{{ s.tanggal.strftime('%d-%m-%Y') if s.tanggal else '-' }}</td>
-          <td>{{ s.ac_unit.customer.nama if s.ac_unit and s.ac_unit.customer else '-' }}</td>
-          <td>{{ s.ac_unit.merk }} ({{ s.ac_unit.pk }})</td>
-          <td>{{ s.technician.nama if s.technician else '-' }}</td>
-          <td>{{ s.jenis_service or '-' }}</td>
-          <td>Rp {{ "{:,.0f}".format(s.harga_total or s.harga or (s.harga_satuan or 0) * (s.jumlah or 1) or 0) }}</td>
-          <td><span class="badge bg-danger">Belum Lunas</span></td>
-          <td>
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('service_edit', id=s.id) }}">
-              <i class="bi bi-pencil"></i> Edit
-            </a>
-            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('service_invoice', id=s.id) }}">
-              <i class="bi bi-receipt"></i> Invoice
-            </a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="list-card">
+    <div class="list-row list-header">
+      <div>Tanggal</div>
+      <div>Customer</div>
+      <div>Unit</div>
+      <div>Teknisi</div>
+      <div>Jenis Service</div>
+      <div>Total</div>
+      <div class="text-center">Aksi</div>
+    </div>
+    {% for s in unpaid_services %}
+    <div class="list-row">
+      <div>{{ s.tanggal.strftime('%d-%m-%Y') if s.tanggal else '-' }}</div>
+      <div>{{ s.ac_unit.customer.nama if s.ac_unit and s.ac_unit.customer else '-' }}</div>
+      <div>{{ s.ac_unit.merk }} ({{ s.ac_unit.pk }})</div>
+      <div>{{ s.technician.nama if s.technician else '-' }}</div>
+      <div>{{ s.jenis_service or '-' }}</div>
+      <div><span class="badge-soft danger">Rp {{ "{:,.0f}".format(s.harga_total or s.harga or (s.harga_satuan or 0) * (s.jumlah or 1) or 0) }}</span></div>
+      <div class="text-center d-flex gap-2 justify-content-center flex-wrap">
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('service_edit', id=s.id) }}" title="Cek Detail Service">
+          <i class="bi bi-file-earmark-text"></i> Cek Detail Service
+        </a>
+        <button class="btn btn-sm btn-success" type="button" onclick="kirimUnpaidReminder({{ s.id }})" title="Kirim WhatsApp">
+          <i class="bi bi-whatsapp"></i> Kirim WhatsApp
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <div class="list-row">
+      <div class="text-muted fst-italic">✅ Tidak ada data belum lunas.</div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+    {% endfor %}
   </div>
 {% else %}
   <p class="text-muted fst-italic">✅ Tidak ada data belum lunas.</p>
 {% endif %}
+</div>
+
+<script>
+function kirimUnpaidReminder(serviceId) {
+  fetch('/service/' + serviceId + '/unpaid-reminder', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'}
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (!data.success) {
+      alert(data.message || 'Gagal mengirim reminder.');
+      return;
+    }
+    window.open(data.wa_url, '_blank');
+  })
+  .catch(err => {
+    console.error(err);
+    alert('Terjadi kesalahan saat mengirim reminder WhatsApp.');
+  });
+}
+</script>
 
 {% endblock %}
