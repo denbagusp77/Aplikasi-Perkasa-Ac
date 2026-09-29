@@ -1,5 +1,5 @@
 from flask import (
-    Flask, render_template, redirect, url_for, request, flash,
+    Flask, current_app, render_template, redirect, url_for, request, flash,
     send_from_directory, make_response, Response, jsonify, send_file
 )
 from flask_login import (
@@ -1488,12 +1488,22 @@ def transactions():
     show_all = request.args.get('all', '0') == '1'
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    search_query = request.args.get('q', '').strip()
 
     # 🔹 Ambil transaksi langsung dari tabel Transaction
     query = Transaction.query
     project_id = request.args.get('project_id', type=int)
     if project_id:
         query = query.filter(Transaction.project_id == project_id)
+
+    if search_query:
+        query = query.filter(
+            or_(
+                Transaction.jenis.ilike(f'%{search_query}%'),
+                Transaction.deskripsi.ilike(f'%{search_query}%'),
+                Transaction.technician_nama.ilike(f'%{search_query}%')
+            )
+        )
 
     if start_date and end_date:
         try:
@@ -1573,7 +1583,7 @@ def transactions():
         bersih_teknisi=bersih_teknisi,
 
         tahun=tahun, bulan=bulan, show_all=show_all,
-        start_date=start_date, end_date=end_date
+        start_date=start_date, end_date=end_date, search_query=search_query
         ,projects=Project.query.order_by(Project.nama).all(), project_id=project_id
     )
 
@@ -2978,21 +2988,6 @@ def invoice_pdf(id):
     invoice = Invoice.query.get_or_404(id)
 
     # ==========================
-    # TEMPLATE SELECTION
-    # ==========================
-    template_map = {
-        "classic": "invoice_templates/classic.html",
-        "modern": "invoice_templates/modern.html",
-        "corporate": "invoice_templates/corporate.html",
-        "industrial": "invoice_templates/industrial.html",
-    }
-
-    selected_template = template_map.get(
-        invoice.template,
-        "invoice_templates/classic.html"
-    )
-
-    # ==========================
     # HELPER FLOAT AMAN
     # ==========================
     def to_float(val, default=0.0):
@@ -3081,33 +3076,237 @@ def invoice_pdf(id):
     sisa = max(0, total - dp)
 
     # ==========================
-    # RENDER HTML
+    # GENERATE PDF WITHOUT EXTERNAL BINARIES
     # ==========================
-    html = render_template(
-        selected_template,
-        invoice=invoice,
-        grouped_items=grouped,
-        subtotal=subtotal,
-        ppn=ppn_percent,
-        ppn_amt=ppn_amt,
-        pph=pph_percent,
-        pph_amt=pph_amt,
-        admin_fee=admin_fee,
-        total=total,
-        dp=dp,
-        sisa=sisa,
-        bank=invoice.bank_account,
-        spo=spo,
-        logo_path=os.path.join(current_app.root_path, "static/logo.png")
+    from xml.sax.saxutils import escape
+
+    output = io.BytesIO()
+    styles = getSampleStyleSheet()
+    ink = colors.HexColor("#263633")
+    muted = colors.HexColor("#697773")
+    forest = colors.HexColor("#174B45")
+    forest_dark = colors.HexColor("#103B37")
+    accent = colors.HexColor("#E5A45A")
+    pale = colors.HexColor("#F1F6F4")
+    rule = colors.HexColor("#DCE5E1")
+
+    body_style = ParagraphStyle(
+        "InvoiceBody", parent=styles["BodyText"], fontName="Helvetica",
+        fontSize=9.5, leading=13, textColor=ink, spaceAfter=0,
+    )
+    small_style = ParagraphStyle(
+        "InvoiceSmall", parent=body_style, fontSize=8, leading=10,
+        textColor=muted,
+    )
+    brand_style = ParagraphStyle(
+        "InvoiceBrand", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=18, leading=22, textColor=colors.white,
+    )
+    header_meta_style = ParagraphStyle(
+        "InvoiceHeaderMeta", parent=body_style, fontSize=8, leading=11,
+        textColor=colors.HexColor("#D9E7E3"), alignment=2,
+    )
+    invoice_title_style = ParagraphStyle(
+        "InvoiceTitle", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=22, leading=26, textColor=colors.white, alignment=2,
+    )
+    section_style = ParagraphStyle(
+        "InvoiceSection", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=7, leading=9, textColor=forest,
+    )
+    customer_name_style = ParagraphStyle(
+        "InvoiceCustomer", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=11, leading=14,
+    )
+    table_header_style = ParagraphStyle(
+        "InvoiceTableHeader", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, textColor=colors.white,
+    )
+    room_style = ParagraphStyle(
+        "InvoiceRoom", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=7.5, leading=9, textColor=forest,
+    )
+    total_label_style = ParagraphStyle(
+        "InvoiceTotalLabel", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=10, leading=14, textColor=colors.white,
+    )
+    total_value_style = ParagraphStyle(
+        "InvoiceTotalValue", parent=total_label_style, alignment=2,
+    )
+    signature_style = ParagraphStyle(
+        "InvoiceSign", parent=body_style, leading=12, alignment=2,
     )
 
-    # ==========================
-    # GENERATE PDF
-    # ==========================
-    pdf = HTML(
-        string=html,
-        base_url=current_app.root_path
-    ).write_pdf()
+    def cell(value, style=body_style):
+        return Paragraph(escape(str(value if value is not None else "-")), style)
+
+    def rupiah(value):
+        return "Rp " + "{:,.0f}".format(value or 0).replace(",", ".")
+
+    def draw_footer(canvas, document):
+        canvas.saveState()
+        canvas.setStrokeColor(rule)
+        canvas.setLineWidth(0.6)
+        canvas.line(document.leftMargin, 28, A4[0] - document.rightMargin, 28)
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(muted)
+        canvas.drawString(document.leftMargin, 17, "PERKASA AC  |  Terima kasih atas kepercayaan Anda")
+        canvas.drawRightString(A4[0] - document.rightMargin, 17, f"{invoice.id}  |  {canvas.getPageNumber()}")
+        canvas.restoreState()
+
+    doc = SimpleDocTemplate(
+        output, pagesize=A4, rightMargin=40, leftMargin=40,
+        topMargin=38, bottomMargin=42,
+    )
+    story = []
+    invoice_date = invoice.tanggal.strftime("%d/%m/%Y") if invoice.tanggal else "-"
+    invoice_number = f"INV-{invoice.tanggal.strftime('%Y') if invoice.tanggal else '-'}-{invoice.id}"
+    header = Table(
+        [[
+            [cell("PERKASA AC", brand_style),
+             cell("HVAC SALES, INSTALLATION & SERVICE", header_meta_style),
+             cell("Jl. Sukabangun Indah 3 No. 07, Palembang", header_meta_style)],
+            [cell("INVOICE", invoice_title_style),
+             cell(invoice_number, header_meta_style),
+             cell(f"Tanggal  {invoice_date}", header_meta_style),
+             cell(f"SPO  {spo or '-'}", header_meta_style)],
+        ]],
+        colWidths=[270, 245],
+    )
+    header.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), forest),
+        ("BACKGROUND", (1, 0), (1, 0), forest_dark),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 15),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 15),
+        ("TOPPADDING", (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LINEBEFORE", (1, 0), (1, 0), 2, accent),
+    ]))
+    story.extend([header, Spacer(1, 24)])
+
+    customer = invoice.customer
+    customer_details = [
+        Paragraph("DITAGIHKAN KEPADA", section_style),
+        Spacer(1, 5),
+        cell(customer.nama or "-", customer_name_style),
+        cell(customer.nomor_wa or "", small_style),
+        cell(customer.alamat or "-", small_style),
+    ]
+    customer_panel = Table([[customer_details]], colWidths=[515])
+    customer_panel.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), pale),
+        ("BOX", (0, 0), (-1, -1), 0.6, rule),
+        ("LINEBEFORE", (0, 0), (0, 0), 3, accent),
+        ("LEFTPADDING", (0, 0), (-1, -1), 13),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 13),
+        ("TOPPADDING", (0, 0), (-1, -1), 11),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
+    ]))
+    story.extend([customer_panel, Spacer(1, 22)])
+
+    item_rows = [[
+        cell("RUANGAN", table_header_style),
+        cell("DESKRIPSI", table_header_style),
+        cell("QTY", table_header_style),
+        cell("HARGA", table_header_style),
+        cell("JUMLAH", table_header_style),
+    ]]
+    group_rows = []
+    for room, items in grouped.items():
+        group_rows.append(len(item_rows))
+        item_rows.append([cell(room, room_style), "", "", "", ""])
+        for item in items:
+            item_rows.append([
+                cell(""), cell(item["deskripsi"]), cell(item["qty"]),
+                cell(rupiah(item["harga"])), cell(rupiah(item["subtotal"])),
+            ])
+    items_table = Table(
+        item_rows, colWidths=[72, 205, 42, 92, 104],
+        repeatRows=1, hAlign="LEFT",
+    )
+    item_table_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), forest),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (2, 0), (2, -1), "CENTER"),
+        ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.45, rule),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]
+    for row_index in group_rows:
+        item_table_style.extend([
+            ("SPAN", (0, row_index), (-1, row_index)),
+            ("BACKGROUND", (0, row_index), (-1, row_index), pale),
+            ("TOPPADDING", (0, row_index), (-1, row_index), 6),
+            ("BOTTOMPADDING", (0, row_index), (-1, row_index), 6),
+        ])
+    items_table.setStyle(TableStyle(item_table_style))
+    story.extend([items_table, Spacer(1, 22)])
+
+    totals = []
+    if ppn_amt:
+        totals.append([cell(f"PPN ({ppn_percent:g}%)"), cell(rupiah(ppn_amt))])
+    if pph_amt:
+        totals.append([cell(f"PPh ({pph_percent:g}%)"), cell("- " + rupiah(pph_amt))])
+    if admin_fee:
+        totals.append([cell("Biaya Admin"), cell("- " + rupiah(admin_fee))])
+    total_row_index = len(totals)
+    totals.append([cell("TOTAL", total_label_style), cell(rupiah(total), total_value_style)])
+    if dp > 0:
+        totals.extend([
+            [cell("DP"), cell(rupiah(dp))],
+            [cell("Sisa Pembayaran", total_label_style), cell(rupiah(sisa), total_value_style)],
+        ])
+    totals_table = Table(totals, colWidths=[116, 132], hAlign="RIGHT")
+    totals_table_style = [
+        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("BACKGROUND", (0, total_row_index), (-1, total_row_index), forest),
+    ]
+    if dp > 0:
+        totals_table_style.extend([
+            ("BACKGROUND", (0, total_row_index), (-1, total_row_index), pale),
+            ("LINEABOVE", (0, total_row_index), (-1, total_row_index), 0.6, rule),
+            ("BACKGROUND", (0, len(totals) - 1), (-1, len(totals) - 1), forest_dark),
+            ("LINEABOVE", (0, len(totals) - 1), (-1, len(totals) - 1), 1, accent),
+        ])
+    totals_table.setStyle(TableStyle(totals_table_style))
+
+    bank = invoice.bank_account
+    bank_details = [Paragraph("PEMBAYARAN", section_style), Spacer(1, 5)]
+    if bank:
+        bank_details.extend([
+            cell(bank.bank_name or "-", customer_name_style),
+            cell(bank.account_name or "-", body_style),
+            cell(bank.account_number or "-", small_style),
+        ])
+    else:
+        bank_details.append(cell("Informasi rekening tidak tersedia", small_style))
+    payment_totals = Table(
+        [[bank_details, totals_table]], colWidths=[267, 248], hAlign="LEFT",
+    )
+    payment_totals.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.extend([
+        payment_totals,
+        Spacer(1, 32),
+        Paragraph("Hormat kami,<br/><br/><br/><b>Perkasa AC</b>", signature_style),
+    ])
+    doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
+    pdf = output.getvalue()
 
     return Response(
         pdf,

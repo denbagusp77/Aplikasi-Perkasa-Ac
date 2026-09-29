@@ -386,16 +386,16 @@
 <body class="{% if not current_user.is_authenticated %}login-page{% endif %}">
 {% if current_user.is_authenticated %}
 <div class="top-toolbar">
-  <div class="toolbar-search">
+  <form class="toolbar-search" action="{{ url_for('transactions') }}" method="get" role="search">
     <i class="bi bi-search"></i>
-    <input type="text" placeholder="Cari proyek, customer, invoice..." aria-label="Search" />
-  </div>
-  <div class="toolbar-action"><i class="bi bi-bell"></i></div>
-  <div class="toolbar-action"><i class="bi bi-gear"></i></div>
-  <div class="toolbar-user">
+    <input type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Cari transaksi, teknisi..." aria-label="Cari transaksi" />
+  </form>
+  <a class="toolbar-action" href="{{ url_for('reminders_auto') }}" title="Buka pengingat" aria-label="Buka pengingat"><i class="bi bi-bell"></i></a>
+  <a class="toolbar-action" href="{{ url_for('settings') }}" title="Buka pengaturan" aria-label="Buka pengaturan"><i class="bi bi-gear"></i></a>
+  <a class="toolbar-user" href="{{ url_for('settings') }}" title="Buka profil dan pengaturan" aria-label="Buka profil">
     <div class="avatar">A</div>
     <span>Hi, admin</span>
-  </div>
+  </a>
 </div>
 <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top border-bottom shadow-sm sidebar-nav">
   <div class="container-fluid p-0">
