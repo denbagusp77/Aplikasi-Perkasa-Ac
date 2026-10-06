@@ -1,0 +1,310 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<style>
+  .payroll-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #7c3aed 100%);
+    border-radius: 22px;
+    padding: 32px;
+    color: white;
+    margin-bottom: 28px;
+    box-shadow: 0 18px 40px rgba(79, 70, 229, 0.22);
+  }
+  .stat-card {
+    border: none;
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+  .stat-card .card-body {
+    padding: 22px 24px;
+  }
+  .mini-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: rgba(255,255,255,0.12);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .filter-box {
+    border: none;
+    border-radius: 18px;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+  }
+  .table-modern {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .table-modern thead th {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+    font-weight: 700;
+    padding: 16px 18px;
+  }
+  .table-modern tbody td {
+    padding: 16px 18px;
+    vertical-align: middle;
+    border-bottom: 1px solid #edf2f7;
+  }
+  .table-modern tbody tr:hover {
+    background: #f8fafc;
+  }
+  .bulk-action-bar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid #edf2f7;
+    background: #fbfcfe;
+  }
+  .bulk-action-select { width: min(100%, 320px); }
+  .bulk-action-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  @media (max-width: 767.98px) {
+    .bulk-action-bar { align-items: stretch; flex-direction: column; }
+    .bulk-action-select { width: 100%; }
+  }
+</style>
+
+<div class="container-fluid py-3">
+  <div class="payroll-hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <div class="mini-pill">
+          <i class="fa fa-star"></i>
+          Modul Insentif Pekerjaan
+        </div>
+        <h1 class="mt-3 mb-2" style="font-size:2.15rem; font-weight:800; margin:0;">Dashboard Insentif</h1>
+        <p class="mb-0 text-white-50">Kelola komisi teknisi berdasarkan total pekerjaan dan periode aktif.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('payroll_index') }}" class="btn btn-light text-dark fw-bold rounded-pill px-3">
+          <i class="fa fa-arrow-left me-2"></i>Payroll
+        </a>
+        <a href="{{ url_for('payroll_incentive_settings') }}" class="btn btn-outline-light fw-bold rounded-pill px-3">
+          <i class="fa fa-cog me-2"></i>Pengaturan
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-3 col-md-6">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small fw-semibold">Total Nilai Job</span>
+            <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1">Job</span>
+          </div>
+          <h4 class="mb-0 fw-bold">{{ total_value|rupiah }}</h4>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small fw-semibold">Total Insentif</span>
+            <span class="badge bg-success-subtle text-success rounded-pill px-2 py-1">Bonus</span>
+          </div>
+          <h4 class="mb-0 fw-bold text-success">{{ total_incentive|rupiah }}</h4>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small fw-semibold">Jumlah Job</span>
+            <span class="badge bg-warning-subtle text-warning rounded-pill px-2 py-1">Aktif</span>
+          </div>
+          <h4 class="mb-0 fw-bold">{{ count_jobs }}</h4>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small fw-semibold">Menunggu Proses</span>
+            <span class="badge bg-info-subtle text-info rounded-pill px-2 py-1">Review</span>
+          </div>
+          <h4 class="mb-0 fw-bold text-info">{{ pending|rupiah }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card filter-box mb-4">
+    <div class="card-body p-3">
+      <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Periode</label>
+          <select name="period" class="form-select rounded-3">
+            <option value="">Pilih periode</option>
+            {% for y in range(2024, 2031) %}
+              {% for m in range(1, 13) %}
+                {% set p = '%04d-%02d'|format(y, m) %}
+                <option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>
+              {% endfor %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Teknisi</label>
+          <select name="technician_id" class="form-select rounded-3">
+            <option value="">Semua teknisi</option>
+            {% for tech in technicians %}
+              <option value="{{ tech.id }}" {% if request.args.get('technician_id')|string == tech.id|string %}selected{% endif %}>{{ tech.nama }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+          <button type="submit" class="btn btn-primary rounded-3 px-4 fw-semibold"><i class="fa fa-filter me-2"></i>Filter</button>
+          <a href="{{ url_for('payroll_incentive_dashboard') }}" class="btn btn-outline-secondary rounded-3 px-4 fw-semibold">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card filter-box mb-4">
+    <div class="card-body p-3">
+      <form method="post" action="{{ url_for('payroll_incentive_generate') }}" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Periode generate</label>
+          <input type="month" name="period" class="form-control rounded-3" value="{{ period }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Teknisi (opsional)</label>
+          <select name="technician_id" class="form-select rounded-3">
+            <option value="">Semua teknisi</option>
+            {% for tech in technicians %}
+              <option value="{{ tech.id }}">{{ tech.nama }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-success rounded-3 px-4 fw-semibold w-100">
+            <i class="fa fa-magic me-2"></i>Generate Insentif
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if top_technicians %}
+  <div class="card filter-box mb-4">
+    <div class="card-header bg-white border-0 pt-3 px-4">
+      <h5 class="mb-0 fw-bold">Top Teknisi</h5>
+    </div>
+    <div class="card-body px-4 pb-4">
+      <div class="row g-3">
+        {% for row in top_technicians %}
+        <div class="col-md-3">
+          <div class="border rounded-4 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-bold">{{ row.tech.nama }}</span>
+              <span class="badge bg-primary-subtle text-primary">#{{ loop.index }}</span>
+            </div>
+            <div class="text-muted small mb-1">Team: {{ row.tech.team or '-' }}</div>
+            <div class="fs-5 fw-bold text-success">{{ row.amount|rupiah }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card filter-box">
+    <form method="post" action="{{ url_for('payroll_incentive_bulk_action') }}" class="bulk-action-bar" id="incentiveBulkActionForm">
+      <input type="hidden" name="period" value="{{ period }}">
+      <div class="bulk-action-select">
+        <label class="form-label fw-semibold mb-1" for="bulkTechnician">Teknisi untuk aksi massal</label>
+        <select class="form-select rounded-3" id="bulkTechnician" name="technician_id" required>
+          <option value="">Pilih teknisi</option>
+          {% for tech in technicians %}
+          <option value="{{ tech.id }}" {% if request.args.get('technician_id')|string == tech.id|string %}selected{% endif %}>{{ tech.nama }}</option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Aksi hanya berlaku untuk insentif teknisi ini pada periode {{ period }}.</small>
+      </div>
+      <div class="bulk-action-buttons">
+        <button type="submit" name="action" value="approve" class="btn btn-success rounded-3 px-3" onclick="return confirm('Setujui semua insentif Draft untuk teknisi dan periode yang dipilih?')">
+          <i class="fa fa-check-double me-1"></i>Approve semua
+        </button>
+        <button type="submit" name="action" value="to_payroll" class="btn btn-dark rounded-3 px-3" onclick="return confirm('Masukkan semua insentif yang sudah disetujui ke payroll teknisi dan periode yang dipilih?')">
+          <i class="fa fa-wallet me-1"></i>Ke Payroll semua
+        </button>
+      </div>
+    </form>
+    <div class="card-header bg-white border-0 pt-3 px-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">Daftar Insentif</h5>
+        <a href="{{ url_for('payroll_incentive_settings') }}" class="btn btn-sm btn-outline-primary rounded-pill">Atur Persentase</a>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-modern mb-0">
+          <thead>
+            <tr>
+              <th>Teknisi</th>
+              <th>Service</th>
+              <th>Periode</th>
+              <th>Nilai Job</th>
+              <th>%</th>
+              <th>Insentif</th>
+              <th>Status</th>
+              <th class="text-center">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if incentives %}
+              {% for item in incentives %}
+              <tr>
+                <td>{{ item.technician.nama if item.technician else '-' }}</td>
+                <td>{{ item.service.jenis_service if item.service else '-' }}</td>
+                <td>{{ item.period }}</td>
+                <td>{{ item.service_value|rupiah }}</td>
+                <td>{{ item.percentage }}%</td>
+                <td class="fw-bold text-success">{{ item.incentive_amount|rupiah }}</td>
+                <td>
+                  <span class="badge bg-{{ item.status|incentive_status_badge }} rounded-pill px-2 py-1">{{ item.status }}</span>
+                </td>
+                <td class="text-center">
+                  <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <a href="{{ url_for('payroll_incentive_detail', id=item.id) }}" class="btn btn-sm btn-outline-primary rounded-pill">Detail</a>
+                    {% if item.status != 'Ditolak' %}
+                    <form method="post" action="{{ url_for('payroll_incentive_approve', id=item.id) }}" class="d-inline">
+                      <input type="hidden" name="decision" value="approve">
+                      <button type="submit" class="btn btn-sm btn-success rounded-pill">Approve</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('payroll_incentive_to_payroll', id=item.id) }}" class="d-inline">
+                      <button type="submit" class="btn btn-sm btn-dark rounded-pill">Ke Payroll</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="8" class="text-center py-5 text-muted">
+                  <i class="fa fa-box-open fa-2x d-block mb-2"></i>
+                  Belum ada data insentif pada periode ini.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
