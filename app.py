@@ -1,5 +1,5 @@
 from flask import (
-    Flask, render_template, redirect, url_for, request, flash,
+    Flask, current_app, render_template, redirect, url_for, request, flash,
     send_from_directory, make_response, Response, jsonify, send_file
 )
 from flask_login import (
@@ -25,6 +25,7 @@ import os
 import re
 import requests
 import pdfkit
+from xml.sax.saxutils import escape
 
 # Excel & PDF
 from openpyxl import Workbook, load_workbook
@@ -466,6 +467,12 @@ class Technician(db.Model):
     services = db.relationship("Service", back_populates="technician", lazy=True)
 
 
+def technician_staff_query():
+    return Technician.query.filter(
+        func.lower(Technician.status) == 'aktif',
+        func.lower(Technician.jabatan).in_(['teknisi', 'helper'])
+    ).order_by(Technician.nama.asc())
+
 
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -657,6 +664,65 @@ class PayrollLog(db.Model):
     payroll = db.relationship('Payroll', backref=db.backref('logs', lazy=True))
 
 
+class IncentiveSetting(db.Model):
+    __tablename__ = 'incentive_setting'
+
+    id = db.Column(db.Integer, primary_key=True)
+    technician_id = db.Column(db.Integer, db.ForeignKey('technician.id'), nullable=False)
+    service_type = db.Column(db.String(100), nullable=True)
+    percentage = db.Column(db.Float, nullable=False, default=0.0)
+    effective_from = db.Column(db.Date, nullable=False, default=date.today)
+    effective_to = db.Column(db.Date, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    technician = db.relationship('Technician', backref='incentive_settings')
+
+
+class Incentive(db.Model):
+    __tablename__ = 'incentive'
+
+    id = db.Column(db.Integer, primary_key=True)
+    technician_id = db.Column(db.Integer, db.ForeignKey('technician.id'), nullable=False)
+    service_id = db.Column(db.Integer, db.ForeignKey('service.id'), nullable=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoice.id'), nullable=True)
+    period = db.Column(db.String(7), nullable=False)
+    service_value = db.Column(db.Float, default=0.0)
+    percentage = db.Column(db.Float, default=0.0)
+    incentive_amount = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(30), default='Draft')
+    payroll_id = db.Column(db.Integer, db.ForeignKey('payroll.id'), nullable=True)
+    approved_by = db.Column(db.String(100), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    rejection_reason = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    technician = db.relationship('Technician', backref='incentives')
+    service = db.relationship('Service', backref='incentives')
+    invoice = db.relationship('Invoice', backref='incentives')
+    payroll = db.relationship('Payroll', backref='incentives')
+
+    __table_args__ = (
+        db.UniqueConstraint('service_id', name='uq_incentive_service'),
+    )
+
+
+class IncentiveAuditLog(db.Model):
+    __tablename__ = 'incentive_audit_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    entity_type = db.Column(db.String(50), nullable=False, default='incentive_setting')
+    entity_id = db.Column(db.Integer, nullable=False)
+    action = db.Column(db.String(100), nullable=False)
+    user = db.Column(db.String(100), nullable=True)
+    before_value = db.Column(db.Text, nullable=True)
+    after_value = db.Column(db.Text, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class Reminder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
@@ -816,6 +882,20 @@ class InvoiceItem(db.Model):
     harga = db.Column(db.Float, default=0.0)
 
     service = db.relationship('Service', backref='invoice_items')
+
+
+@app.before_request
+def ensure_incentive_tables():
+    if not request.path.startswith('/payroll/incentive'):
+        return
+
+    incentive_tables = [
+        IncentiveSetting.__table__,
+        Incentive.__table__,
+        IncentiveAuditLog.__table__,
+    ]
+    for table in incentive_tables:
+        table.create(bind=db.engine, checkfirst=True)
 
 # user loader
 @login_manager.user_loader
@@ -1488,12 +1568,22 @@ def transactions():
     show_all = request.args.get('all', '0') == '1'
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    search_query = request.args.get('q', '').strip()
 
     # 🔹 Ambil transaksi langsung dari tabel Transaction
     query = Transaction.query
     project_id = request.args.get('project_id', type=int)
     if project_id:
         query = query.filter(Transaction.project_id == project_id)
+
+    if search_query:
+        query = query.filter(
+            or_(
+                Transaction.jenis.ilike(f'%{search_query}%'),
+                Transaction.deskripsi.ilike(f'%{search_query}%'),
+                Transaction.technician_nama.ilike(f'%{search_query}%')
+            )
+        )
 
     if start_date and end_date:
         try:
@@ -1573,7 +1663,7 @@ def transactions():
         bersih_teknisi=bersih_teknisi,
 
         tahun=tahun, bulan=bulan, show_all=show_all,
-        start_date=start_date, end_date=end_date
+        start_date=start_date, end_date=end_date, search_query=search_query
         ,projects=Project.query.order_by(Project.nama).all(), project_id=project_id
     )
 
@@ -1642,8 +1732,8 @@ def transaction_new():
             return redirect(url_for('projects', project_id=t.project_id))
         return redirect(url_for('transactions'))
 
-    # Ambil daftar teknisi yang aktif saja
-    teknisi_all = Technician.query.filter_by(status='Aktif').order_by(Technician.nama).all()
+    # Ambil daftar teknisi yang aktif saja dan memiliki jabatan teknisi/helper
+    teknisi_all = technician_staff_query().all()
     selected_project_id = request.args.get('project_id', type=int)
     return render_template(
         "transaction_form_modern.html",
@@ -2534,7 +2624,7 @@ def service_new(unit_id):
     unit = ACUnit.query.get_or_404(unit_id)
     service_types = ServiceType.query.all()
     packages = Package.query.all()
-    technicians = Technician.query.all()
+    technicians = technician_staff_query().all()
 
     if request.method == 'POST':
         idx = 0
@@ -2604,6 +2694,9 @@ def service_new(unit_id):
 
             idx += 1
 
+        for s in new_services:
+            sync_service_incentive(s)
+
         db.session.commit()
         flash("✅ Service berhasil ditambahkan", "success")
         return redirect(url_for('units', cid=unit.customer_id))
@@ -2630,7 +2723,7 @@ def service_edit(id):
     s = Service.query.get_or_404(id)
 
     # 🔹 Data tambahan untuk form
-    technicians = Technician.query.all()
+    technicians = technician_staff_query().all()
     service_types = ServiceType.query.all()
     packages = Package.query.all()
     unit = s.ac_unit  # ✅ FIXED: ganti dari s.unit ke s.ac_unit
@@ -2713,6 +2806,8 @@ def service_edit(id):
             if existing_tx:
                 db.session.delete(existing_tx)
 
+        sync_service_incentive(s)
+
         db.session.commit()
         flash('✅ Service berhasil diperbarui', 'success')
         return redirect(url_for('units', cid=s.ac_unit.customer_id, edit_service=s.id))  # ✅ FIXED
@@ -2736,6 +2831,7 @@ def service_edit(id):
 @login_required
 def service_delete(id):
     s = Service.query.get_or_404(id)
+    Incentive.query.filter_by(service_id=s.id).delete()
     cid = s.ac_unit.customer_id  # ✅ FIXED
 
     # 🔹 Hapus transaksi terkait
@@ -2810,7 +2906,7 @@ def unpaid_list():
         query = query.filter(Service.technician_id == technician_id)
 
     unpaid_services = query.order_by(Service.tanggal.desc()).all()
-    technicians = Technician.query.order_by(Technician.nama.asc()).all()
+    technicians = technician_staff_query().all()
 
     # ✅ Hitung total belum lunas dari field 'harga_total' / 'harga' / 'harga_satuan * jumlah'
     total_belum_lunas = 0
@@ -2978,21 +3074,6 @@ def invoice_pdf(id):
     invoice = Invoice.query.get_or_404(id)
 
     # ==========================
-    # TEMPLATE SELECTION
-    # ==========================
-    template_map = {
-        "classic": "invoice_templates/classic.html",
-        "modern": "invoice_templates/modern.html",
-        "corporate": "invoice_templates/corporate.html",
-        "industrial": "invoice_templates/industrial.html",
-    }
-
-    selected_template = template_map.get(
-        invoice.template,
-        "invoice_templates/classic.html"
-    )
-
-    # ==========================
     # HELPER FLOAT AMAN
     # ==========================
     def to_float(val, default=0.0):
@@ -3081,33 +3162,237 @@ def invoice_pdf(id):
     sisa = max(0, total - dp)
 
     # ==========================
-    # RENDER HTML
+    # GENERATE PDF WITHOUT EXTERNAL BINARIES
     # ==========================
-    html = render_template(
-        selected_template,
-        invoice=invoice,
-        grouped_items=grouped,
-        subtotal=subtotal,
-        ppn=ppn_percent,
-        ppn_amt=ppn_amt,
-        pph=pph_percent,
-        pph_amt=pph_amt,
-        admin_fee=admin_fee,
-        total=total,
-        dp=dp,
-        sisa=sisa,
-        bank=invoice.bank_account,
-        spo=spo,
-        logo_path=os.path.join(current_app.root_path, "static/logo.png")
+    from xml.sax.saxutils import escape
+
+    output = io.BytesIO()
+    styles = getSampleStyleSheet()
+    ink = colors.HexColor("#263633")
+    muted = colors.HexColor("#697773")
+    forest = colors.HexColor("#174B45")
+    forest_dark = colors.HexColor("#103B37")
+    accent = colors.HexColor("#E5A45A")
+    pale = colors.HexColor("#F1F6F4")
+    rule = colors.HexColor("#DCE5E1")
+
+    body_style = ParagraphStyle(
+        "InvoiceBody", parent=styles["BodyText"], fontName="Helvetica",
+        fontSize=9.5, leading=13, textColor=ink, spaceAfter=0,
+    )
+    small_style = ParagraphStyle(
+        "InvoiceSmall", parent=body_style, fontSize=8, leading=10,
+        textColor=muted,
+    )
+    brand_style = ParagraphStyle(
+        "InvoiceBrand", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=18, leading=22, textColor=colors.white,
+    )
+    header_meta_style = ParagraphStyle(
+        "InvoiceHeaderMeta", parent=body_style, fontSize=8, leading=11,
+        textColor=colors.HexColor("#D9E7E3"), alignment=2,
+    )
+    invoice_title_style = ParagraphStyle(
+        "InvoiceTitle", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=22, leading=26, textColor=colors.white, alignment=2,
+    )
+    section_style = ParagraphStyle(
+        "InvoiceSection", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=7, leading=9, textColor=forest,
+    )
+    customer_name_style = ParagraphStyle(
+        "InvoiceCustomer", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=11, leading=14,
+    )
+    table_header_style = ParagraphStyle(
+        "InvoiceTableHeader", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=8, leading=10, textColor=colors.white,
+    )
+    room_style = ParagraphStyle(
+        "InvoiceRoom", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=7.5, leading=9, textColor=forest,
+    )
+    total_label_style = ParagraphStyle(
+        "InvoiceTotalLabel", parent=body_style, fontName="Helvetica-Bold",
+        fontSize=10, leading=14, textColor=colors.white,
+    )
+    total_value_style = ParagraphStyle(
+        "InvoiceTotalValue", parent=total_label_style, alignment=2,
+    )
+    signature_style = ParagraphStyle(
+        "InvoiceSign", parent=body_style, leading=12, alignment=2,
     )
 
-    # ==========================
-    # GENERATE PDF
-    # ==========================
-    pdf = HTML(
-        string=html,
-        base_url=current_app.root_path
-    ).write_pdf()
+    def cell(value, style=body_style):
+        return Paragraph(escape(str(value if value is not None else "-")), style)
+
+    def rupiah(value):
+        return "Rp " + "{:,.0f}".format(value or 0).replace(",", ".")
+
+    def draw_footer(canvas, document):
+        canvas.saveState()
+        canvas.setStrokeColor(rule)
+        canvas.setLineWidth(0.6)
+        canvas.line(document.leftMargin, 28, A4[0] - document.rightMargin, 28)
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(muted)
+        canvas.drawString(document.leftMargin, 17, "PERKASA AC  |  Terima kasih atas kepercayaan Anda")
+        canvas.drawRightString(A4[0] - document.rightMargin, 17, f"{invoice.id}  |  {canvas.getPageNumber()}")
+        canvas.restoreState()
+
+    doc = SimpleDocTemplate(
+        output, pagesize=A4, rightMargin=40, leftMargin=40,
+        topMargin=38, bottomMargin=42,
+    )
+    story = []
+    invoice_date = invoice.tanggal.strftime("%d/%m/%Y") if invoice.tanggal else "-"
+    invoice_number = f"INV-{invoice.tanggal.strftime('%Y') if invoice.tanggal else '-'}-{invoice.id}"
+    header = Table(
+        [[
+            [cell("PERKASA AC", brand_style),
+             cell("HVAC SALES, INSTALLATION & SERVICE", header_meta_style),
+             cell("Jl. Sukabangun Indah 3 No. 07, Palembang", header_meta_style)],
+            [cell("INVOICE", invoice_title_style),
+             cell(invoice_number, header_meta_style),
+             cell(f"Tanggal  {invoice_date}", header_meta_style),
+             cell(f"SPO  {spo or '-'}", header_meta_style)],
+        ]],
+        colWidths=[270, 245],
+    )
+    header.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), forest),
+        ("BACKGROUND", (1, 0), (1, 0), forest_dark),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 15),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 15),
+        ("TOPPADDING", (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LINEBEFORE", (1, 0), (1, 0), 2, accent),
+    ]))
+    story.extend([header, Spacer(1, 24)])
+
+    customer = invoice.customer
+    customer_details = [
+        Paragraph("DITAGIHKAN KEPADA", section_style),
+        Spacer(1, 5),
+        cell(customer.nama or "-", customer_name_style),
+        cell(customer.nomor_wa or "", small_style),
+        cell(customer.alamat or "-", small_style),
+    ]
+    customer_panel = Table([[customer_details]], colWidths=[515])
+    customer_panel.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), pale),
+        ("BOX", (0, 0), (-1, -1), 0.6, rule),
+        ("LINEBEFORE", (0, 0), (0, 0), 3, accent),
+        ("LEFTPADDING", (0, 0), (-1, -1), 13),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 13),
+        ("TOPPADDING", (0, 0), (-1, -1), 11),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
+    ]))
+    story.extend([customer_panel, Spacer(1, 22)])
+
+    item_rows = [[
+        cell("RUANGAN", table_header_style),
+        cell("DESKRIPSI", table_header_style),
+        cell("QTY", table_header_style),
+        cell("HARGA", table_header_style),
+        cell("JUMLAH", table_header_style),
+    ]]
+    group_rows = []
+    for room, items in grouped.items():
+        group_rows.append(len(item_rows))
+        item_rows.append([cell(room, room_style), "", "", "", ""])
+        for item in items:
+            item_rows.append([
+                cell(""), cell(item["deskripsi"]), cell(item["qty"]),
+                cell(rupiah(item["harga"])), cell(rupiah(item["subtotal"])),
+            ])
+    items_table = Table(
+        item_rows, colWidths=[72, 205, 42, 92, 104],
+        repeatRows=1, hAlign="LEFT",
+    )
+    item_table_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), forest),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (2, 0), (2, -1), "CENTER"),
+        ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.45, rule),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]
+    for row_index in group_rows:
+        item_table_style.extend([
+            ("SPAN", (0, row_index), (-1, row_index)),
+            ("BACKGROUND", (0, row_index), (-1, row_index), pale),
+            ("TOPPADDING", (0, row_index), (-1, row_index), 6),
+            ("BOTTOMPADDING", (0, row_index), (-1, row_index), 6),
+        ])
+    items_table.setStyle(TableStyle(item_table_style))
+    story.extend([items_table, Spacer(1, 22)])
+
+    totals = []
+    if ppn_amt:
+        totals.append([cell(f"PPN ({ppn_percent:g}%)"), cell(rupiah(ppn_amt))])
+    if pph_amt:
+        totals.append([cell(f"PPh ({pph_percent:g}%)"), cell("- " + rupiah(pph_amt))])
+    if admin_fee:
+        totals.append([cell("Biaya Admin"), cell("- " + rupiah(admin_fee))])
+    total_row_index = len(totals)
+    totals.append([cell("TOTAL", total_label_style), cell(rupiah(total), total_value_style)])
+    if dp > 0:
+        totals.extend([
+            [cell("DP"), cell(rupiah(dp))],
+            [cell("Sisa Pembayaran", total_label_style), cell(rupiah(sisa), total_value_style)],
+        ])
+    totals_table = Table(totals, colWidths=[116, 132], hAlign="RIGHT")
+    totals_table_style = [
+        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("BACKGROUND", (0, total_row_index), (-1, total_row_index), forest),
+    ]
+    if dp > 0:
+        totals_table_style.extend([
+            ("BACKGROUND", (0, total_row_index), (-1, total_row_index), pale),
+            ("LINEABOVE", (0, total_row_index), (-1, total_row_index), 0.6, rule),
+            ("BACKGROUND", (0, len(totals) - 1), (-1, len(totals) - 1), forest_dark),
+            ("LINEABOVE", (0, len(totals) - 1), (-1, len(totals) - 1), 1, accent),
+        ])
+    totals_table.setStyle(TableStyle(totals_table_style))
+
+    bank = invoice.bank_account
+    bank_details = [Paragraph("PEMBAYARAN", section_style), Spacer(1, 5)]
+    if bank:
+        bank_details.extend([
+            cell(bank.bank_name or "-", customer_name_style),
+            cell(bank.account_name or "-", body_style),
+            cell(bank.account_number or "-", small_style),
+        ])
+    else:
+        bank_details.append(cell("Informasi rekening tidak tersedia", small_style))
+    payment_totals = Table(
+        [[bank_details, totals_table]], colWidths=[267, 248], hAlign="LEFT",
+    )
+    payment_totals.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.extend([
+        payment_totals,
+        Spacer(1, 32),
+        Paragraph("Hormat kami,<br/><br/><br/><b>Perkasa AC</b>", signature_style),
+    ])
+    doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
+    pdf = output.getvalue()
 
     return Response(
         pdf,
@@ -3303,7 +3588,7 @@ def service_motor_list():
 @app.route('/service_motor/tambah', methods=['GET', 'POST'])
 @login_required
 def service_motor_tambah():
-    technicians = Technician.query.filter_by(status="Aktif").all()
+    technicians = technician_staff_query().all()
 
     if request.method == 'POST':
         tech_id = request.form['technician_id']
@@ -3505,6 +3790,411 @@ def hitung_hari_kerja(start_date, end_date):
 # GAJI & TUNJANGAN (PERBAIKAN)
 # ==================================================
 
+def normalize_service_type(value):
+    if value is None:
+        return ""
+    return str(value).strip().lower().replace('-', ' ').replace('_', ' ')
+
+
+def active_incentive_setting_for(technician_id, target_date, service_type=None):
+    if technician_id is None:
+        return None
+
+    target_date = target_date or date.today()
+    match_query = IncentiveSetting.query.filter(
+        IncentiveSetting.technician_id == technician_id,
+        IncentiveSetting.is_active.is_(True),
+        IncentiveSetting.effective_from <= target_date,
+        (IncentiveSetting.effective_to.is_(None)) |
+        (IncentiveSetting.effective_to >= target_date)
+    ).order_by(IncentiveSetting.effective_from.desc())
+
+    settings = match_query.all()
+    if not settings:
+        return None
+
+    normalized_service_type = normalize_service_type(service_type)
+    if normalized_service_type:
+        exact = [
+            s for s in settings
+            if normalize_service_type(s.service_type) == normalized_service_type
+        ]
+        if exact:
+            return exact[0]
+
+        partial = [
+            s for s in settings
+            if normalize_service_type(s.service_type)
+            and (
+                normalized_service_type in normalize_service_type(s.service_type)
+                or normalize_service_type(s.service_type) in normalized_service_type
+            )
+        ]
+        if partial:
+            return partial[0]
+
+    general = [s for s in settings if not normalize_service_type(s.service_type)]
+    if general:
+        return general[0]
+
+    return settings[0]
+
+
+def sync_service_incentive(service):
+    if not service:
+        return False
+
+    incentive = Incentive.query.filter_by(service_id=service.id).first()
+    if incentive and (incentive.status != 'Draft' or incentive.payroll_id):
+        return False
+
+    setting = None
+    service_value = float(service.total_harga or 0)
+    if service.technician_id and service.tanggal and service_value > 0:
+        setting = active_incentive_setting_for(
+            service.technician_id, service.tanggal, service.jenis_service
+        )
+
+    if not setting:
+        if incentive:
+            db.session.delete(incentive)
+        return False
+
+    percentage = float(setting.percentage)
+    incentive_values = {
+        'technician_id': service.technician_id,
+        'period': service.tanggal.strftime('%Y-%m'),
+        'service_value': service_value,
+        'percentage': percentage,
+        'incentive_amount': service_value * (percentage / 100.0),
+    }
+
+    if incentive:
+        for field, value in incentive_values.items():
+            setattr(incentive, field, value)
+    else:
+        incentive = Incentive(
+            service_id=service.id,
+            status='Draft',
+            **incentive_values
+        )
+        db.session.add(incentive)
+    return True
+
+
+def generate_incentive_records(period=None, technician_id=None):
+    period = period or date.today().strftime('%Y-%m')
+    q = Service.query.filter(Service.technician_id.isnot(None), Service.tanggal.isnot(None))
+    if technician_id:
+        q = q.filter(Service.technician_id == technician_id)
+
+    generated = 0
+    for service in q.all():
+        service_period = service.tanggal.strftime('%Y-%m') if service.tanggal else None
+        if service_period != period:
+            continue
+
+        if sync_service_incentive(service):
+            generated += 1
+
+    db.session.commit()
+    return generated
+
+
+@app.route('/payroll/incentive')
+@login_required
+def payroll_incentive_dashboard():
+    period = request.args.get('period') or date.today().strftime('%Y-%m')
+    technician_id = request.args.get('technician_id', type=int)
+    technicians = technician_staff_query().all()
+    settings = IncentiveSetting.query.order_by(IncentiveSetting.effective_from.desc(), IncentiveSetting.id.desc()).all()
+
+    auto_generated = generate_incentive_records(period=period, technician_id=technician_id)
+
+    incentives_query = Incentive.query.filter_by(period=period)
+    if technician_id:
+        incentives_query = incentives_query.filter_by(technician_id=technician_id)
+    incentives = incentives_query.order_by(Incentive.created_at.desc()).all()
+
+    total_value = sum(i.service_value or 0 for i in incentives)
+    total_incentive = sum(i.incentive_amount or 0 for i in incentives)
+    count_jobs = len(incentives)
+    pending = sum(i.incentive_amount or 0 for i in incentives if i.status in ['Draft', 'Menunggu Verifikasi'])
+
+    top_technicians = []
+    technician_groups = defaultdict(float)
+    for inc in incentives:
+        technician_groups[inc.technician_id] += float(inc.incentive_amount or 0)
+
+    for tech_id, total_amount in sorted(technician_groups.items(), key=lambda x: x[1], reverse=True):
+        technician = Technician.query.get(tech_id)
+        if technician:
+            top_technicians.append({'tech': technician, 'amount': total_amount})
+
+    return render_template(
+        'payroll/incentive_dashboard.html',
+        period=period,
+        technicians=technicians,
+        settings=settings,
+        incentives=incentives,
+        total_value=total_value,
+        total_incentive=total_incentive,
+        count_jobs=count_jobs,
+        pending=pending,
+        top_technicians=top_technicians[:5]
+    )
+
+
+@app.route('/payroll/incentive/generate', methods=['POST'])
+@login_required
+def payroll_incentive_generate():
+    period = request.form.get('period') or date.today().strftime('%Y-%m')
+    technician_id = request.form.get('technician_id', type=int)
+    generated = generate_incentive_records(period=period, technician_id=technician_id)
+    flash(f'✅ {generated} data insentif dibuat untuk periode {period}.', 'success')
+    return redirect(url_for('payroll_incentive_dashboard', period=period))
+
+
+@app.route('/payroll/incentive/settings', methods=['GET', 'POST'])
+@login_required
+def payroll_incentive_settings():
+    technician_id = request.args.get('technician_id', type=int) or request.form.get('technician_id', type=int)
+    selected_technician = Technician.query.get(technician_id) if technician_id else None
+    settings = IncentiveSetting.query.order_by(IncentiveSetting.effective_from.desc(), IncentiveSetting.id.desc()).all()
+
+    if request.method == 'POST':
+        technician_id = request.form.get('technician_id', type=int)
+        if not technician_id:
+            flash('⚠️ Teknisi wajib dipilih.', 'warning')
+            return redirect(url_for('payroll_incentive_settings'))
+
+        percentage = float(request.form.get('percentage', 0) or 0)
+        if percentage < 0 or percentage > 100:
+            flash('⚠️ Persentase insentif harus di antara 0 dan 100.', 'danger')
+            return redirect(url_for('payroll_incentive_settings', technician_id=technician_id))
+
+        effective_from = request.form.get('effective_from')
+        effective_to = request.form.get('effective_to') or None
+        instance = IncentiveSetting(
+            technician_id=technician_id,
+            service_type=None,
+            percentage=percentage,
+            effective_from=datetime.strptime(effective_from, '%Y-%m-%d').date() if effective_from else date.today(),
+            effective_to=datetime.strptime(effective_to, '%Y-%m-%d').date() if effective_to else None,
+            is_active=request.form.get('is_active') == 'on'
+        )
+        db.session.add(instance)
+        db.session.commit()
+
+        audit_log = IncentiveAuditLog(
+            entity_type='incentive_setting',
+            entity_id=instance.id,
+            action='create',
+            user=current_user.username if hasattr(current_user, 'username') else 'admin',
+            before_value=None,
+            after_value=json.dumps({
+                'technician_id': technician_id,
+                'service_type': instance.service_type,
+                'percentage': percentage,
+                'effective_from': str(instance.effective_from),
+                'effective_to': str(instance.effective_to) if instance.effective_to else None,
+                'is_active': instance.is_active,
+            })
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        flash('✅ Pengaturan insentif berhasil disimpan.', 'success')
+        return redirect(url_for('payroll_incentive_settings', technician_id=technician_id))
+
+    return render_template(
+        'payroll/incentive_settings.html',
+        technicians=technician_staff_query().all(),
+        settings=settings,
+        selected_technician=selected_technician,
+        today=date.today()
+    )
+
+
+@app.route('/payroll/incentive/settings/<int:id>/delete', methods=['POST'])
+@login_required
+def payroll_incentive_setting_delete(id):
+    setting = IncentiveSetting.query.get_or_404(id)
+    technician_id = setting.technician_id
+    db.session.delete(setting)
+    db.session.commit()
+    flash('✅ Pengaturan insentif berhasil dihapus.', 'success')
+    return redirect(url_for('payroll_incentive_settings', technician_id=technician_id))
+
+
+@app.route('/payroll/incentive/<int:id>/detail')
+@login_required
+def payroll_incentive_detail(id):
+    incentive = Incentive.query.get_or_404(id)
+    return render_template('payroll/incentive_detail.html', incentive=incentive)
+
+
+@app.route('/payroll/incentive/<int:id>/approve', methods=['POST'])
+@login_required
+def payroll_incentive_approve(id):
+    incentive = Incentive.query.get_or_404(id)
+    decision = request.form.get('decision')
+    if decision == 'reject':
+        incentive.status = 'Ditolak'
+        incentive.rejection_reason = request.form.get('rejection_reason') or 'Tidak ada alasan.'
+    else:
+        incentive.status = 'Disetujui'
+        incentive.rejection_reason = None
+    incentive.approved_by = current_user.username if hasattr(current_user, 'username') else 'admin'
+    incentive.approved_at = datetime.utcnow()
+    db.session.commit()
+    flash('✅ Status insentif diperbarui.', 'success')
+    return redirect(url_for('payroll_incentive_dashboard', period=incentive.period))
+
+
+@app.route('/payroll/incentive/<int:id>/to_payroll', methods=['POST'])
+@login_required
+def payroll_incentive_to_payroll(id):
+    incentive = Incentive.query.get_or_404(id)
+    if incentive.status not in ['Disetujui', 'Masuk Payroll']:
+        flash('⚠️ Insentif harus sudah disetujui sebelum masuk payroll.', 'warning')
+        return redirect(url_for('payroll_incentive_dashboard', period=incentive.period))
+
+    payroll = Payroll.query.filter_by(employee_id=incentive.technician_id, periode=incentive.period).first()
+    if payroll is None:
+        payroll = Payroll(
+            employee_id=incentive.technician_id,
+            periode=incentive.period,
+            total_pendapatan=0,
+            total_potongan=0,
+            gaji_bersih=0,
+            status='Draft'
+        )
+        db.session.add(payroll)
+        db.session.flush()
+
+    item_description = f'Insentif Pekerjaan {incentive.period} #{incentive.id}'
+    duplicate = PayrollItem.query.filter_by(payroll_id=payroll.id, deskripsi=item_description).first()
+    if duplicate is not None:
+        flash('⚠️ Insentif ini sudah masuk payroll.', 'info')
+        return redirect(url_for('payroll_incentive_dashboard', period=incentive.period))
+
+    item = PayrollItem(
+        payroll_id=payroll.id,
+        kategori='Pendapatan',
+        deskripsi=item_description,
+        jumlah=incentive.incentive_amount or 0
+    )
+    db.session.add(item)
+    payroll.total_pendapatan = (payroll.total_pendapatan or 0) + (incentive.incentive_amount or 0)
+    payroll.gaji_bersih = (payroll.total_pendapatan or 0) - (payroll.total_potongan or 0)
+    incentive.status = 'Masuk Payroll'
+    incentive.payroll_id = payroll.id
+    db.session.commit()
+    flash('✅ Insentif berhasil dimasukkan ke payroll.', 'success')
+    return redirect(url_for('payroll_incentive_dashboard', period=incentive.period))
+
+
+@app.route('/payroll/incentive/bulk-action', methods=['POST'])
+@login_required
+def payroll_incentive_bulk_action():
+    period = request.form.get('period') or date.today().strftime('%Y-%m')
+    technician_id = request.form.get('technician_id', type=int)
+    action = request.form.get('action')
+    redirect_args = {'period': period}
+    if technician_id:
+        redirect_args['technician_id'] = technician_id
+
+    if not technician_id:
+        flash('Pilih teknisi terlebih dahulu.', 'warning')
+        return redirect(url_for('payroll_incentive_dashboard', **redirect_args))
+
+    technician = Technician.query.get(technician_id)
+    if not technician:
+        flash('Teknisi tidak ditemukan.', 'danger')
+        return redirect(url_for('payroll_incentive_dashboard', **redirect_args))
+
+    incentives_query = Incentive.query.filter_by(
+        period=period,
+        technician_id=technician_id,
+    )
+
+    if action == 'approve':
+        pending_incentives = incentives_query.filter(
+            Incentive.status.in_(['Draft', 'Menunggu Verifikasi']),
+            Incentive.payroll_id.is_(None),
+        ).all()
+        approved_by = current_user.username if hasattr(current_user, 'username') else 'admin'
+        approved_at = datetime.utcnow()
+        for incentive in pending_incentives:
+            incentive.status = 'Disetujui'
+            incentive.rejection_reason = None
+            incentive.approved_by = approved_by
+            incentive.approved_at = approved_at
+
+        db.session.commit()
+        flash(f'{len(pending_incentives)} insentif {technician.nama} disetujui untuk periode {period}.', 'success')
+        return redirect(url_for('payroll_incentive_dashboard', **redirect_args))
+
+    if action == 'to_payroll':
+        approved_incentives = incentives_query.filter_by(status='Disetujui').filter(
+            Incentive.payroll_id.is_(None)
+        ).all()
+        if not approved_incentives:
+            flash(f'Tidak ada insentif {technician.nama} yang siap dimasukkan ke payroll untuk periode {period}.', 'info')
+            return redirect(url_for('payroll_incentive_dashboard', **redirect_args))
+
+        payroll = Payroll.query.filter_by(employee_id=technician_id, periode=period).first()
+        if payroll is not None and payroll.status == 'Final':
+            flash('Payroll sudah final dan tidak dapat ditambahkan insentif.', 'warning')
+            return redirect(url_for('payroll_incentive_dashboard', **redirect_args))
+
+        if payroll is None:
+            payroll = Payroll(
+                employee_id=technician_id,
+                periode=period,
+                total_pendapatan=0,
+                total_potongan=0,
+                gaji_bersih=0,
+                status='Draft',
+            )
+            db.session.add(payroll)
+            db.session.flush()
+
+        ensure_payroll_base_items(payroll, technician)
+
+        total_amount = 0.0
+        for incentive in approved_incentives:
+            item_description = f'Insentif Pekerjaan {period} #{incentive.id}'
+            duplicate = PayrollItem.query.filter_by(
+                payroll_id=payroll.id,
+                deskripsi=item_description,
+            ).first()
+            if duplicate:
+                incentive.status = 'Masuk Payroll'
+                incentive.payroll_id = payroll.id
+                continue
+
+            amount = float(incentive.incentive_amount or 0)
+            db.session.add(PayrollItem(
+                payroll_id=payroll.id,
+                kategori='Pendapatan',
+                deskripsi=item_description,
+                jumlah=amount,
+            ))
+            total_amount += amount
+            incentive.status = 'Masuk Payroll'
+            incentive.payroll_id = payroll.id
+
+        payroll.total_pendapatan = float(payroll.total_pendapatan or 0) + total_amount
+        payroll.gaji_bersih = payroll.total_pendapatan - float(payroll.total_potongan or 0)
+        db.session.commit()
+        flash(f'{len(approved_incentives)} insentif {technician.nama} dimasukkan ke payroll periode {period}.', 'success')
+        return redirect(url_for('payroll_incentive_dashboard', **redirect_args))
+
+    flash('Aksi insentif tidak dikenali.', 'danger')
+    return redirect(url_for('payroll_incentive_dashboard', **redirect_args))
+
+
 @app.route('/payroll')
 @login_required
 def payroll_index():
@@ -3516,9 +4206,9 @@ def payroll_index():
 
     payrolls = query.order_by(Payroll.periode.desc()).all()
 
-    technicians = Technician.query.filter_by(status="Aktif", team="Internal") \
-                                  .order_by(Technician.nama) \
-                                  .all()
+    technicians = technician_staff_query().filter(
+        func.lower(Technician.team) == 'internal'
+    ).all()
 
     # Hitung periode valid (bulan berjalan + 3 bulan sebelumnya)
     today = date.today()
@@ -3547,11 +4237,149 @@ def payroll_index():
 # =========================
 # DETAIL PAYROLL (DIPERBAIKI)
 # =========================
+def ensure_payroll_base_items(payroll, employee):
+    if payroll.status == 'Final':
+        return False
+
+    db.session.flush()
+    existing_items = PayrollItem.query.filter_by(payroll_id=payroll.id).all()
+    if any(item.deskripsi == 'Gaji Pokok' for item in existing_items):
+        return False
+
+    tahun, bulan = map(int, payroll.periode.split('-'))
+    awal_bulan = date(tahun, bulan, 1)
+    akhir_bulan = date(tahun, bulan, monthrange(tahun, bulan)[1])
+    aktif_mulai = max(awal_bulan, employee.tanggal_masuk) if employee.tanggal_masuk else awal_bulan
+    aktif_sampai = min(akhir_bulan, employee.tanggal_keluar) if employee.tanggal_keluar else akhir_bulan
+
+    if aktif_sampai < aktif_mulai:
+        return False
+
+    hari_kerja_aktif = hitung_hari_kerja(aktif_mulai, aktif_sampai)
+    total_hadir = Attendance.query.filter(
+        Attendance.technician_id == employee.id,
+        Attendance.tanggal >= aktif_mulai,
+        Attendance.tanggal <= aktif_sampai,
+        Attendance.status == 'Hadir',
+    ).count()
+    total_izin = Attendance.query.filter(
+        Attendance.technician_id == employee.id,
+        Attendance.tanggal >= aktif_mulai,
+        Attendance.tanggal <= aktif_sampai,
+        Attendance.status.in_(['Izin', 'Sakit']),
+    ).count()
+    total_alpa = max(hari_kerja_aktif - total_hadir - total_izin, 0)
+
+    setting = PayrollSetting.query.filter_by(employee_id=employee.id).first()
+    gaji_pokok = float(
+        setting.gaji_pokok
+        if setting and setting.gaji_pokok is not None
+        else (employee.gaji_pokok or 0)
+    )
+    bonus_bulanan = float(setting.bonus_bulanan or 0) if setting else 0
+    uang_makan_harian = float(setting.uang_makan_harian or 0) if setting else 0
+    uang_bensin_harian = float(setting.uang_bensin_harian or 0) if setting else 0
+    gaji_per_hari = gaji_pokok / 26 if gaji_pokok > 0 else 0
+    gaji_pokok_prorata = gaji_per_hari * hari_kerja_aktif
+    potongan_absen = total_alpa * gaji_per_hari
+
+    kasbon_list = Kasbon.query.filter(
+        Kasbon.technician_id == employee.id,
+        Kasbon.status == 'Belum Lunas',
+        Kasbon.terpilih.is_(True),
+        Kasbon.payroll_id.is_(None),
+    ).all()
+    potongan_kasbon = sum(float(kasbon.jumlah or 0) for kasbon in kasbon_list)
+
+    service_motor_list = ServiceMotor.query.filter(
+        ServiceMotor.technician_id == employee.id,
+        ServiceMotor.terpilih.is_(True),
+        ServiceMotor.payroll_id.is_(None),
+    ).all()
+    potongan_service_motor = sum(
+        float(service_motor.porsi_teknisi or 0)
+        for service_motor in service_motor_list
+    )
+
+    new_items = [PayrollItem(
+        payroll_id=payroll.id,
+        kategori='Pendapatan',
+        deskripsi='Gaji Pokok',
+        jumlah=gaji_pokok_prorata,
+    )]
+    if bonus_bulanan > 0:
+        new_items.append(PayrollItem(
+            payroll_id=payroll.id,
+            kategori='Pendapatan',
+            deskripsi='Bonus Bulanan',
+            jumlah=bonus_bulanan,
+        ))
+    if uang_makan_harian > 0 and total_hadir > 0:
+        new_items.append(PayrollItem(
+            payroll_id=payroll.id,
+            kategori='Pendapatan',
+            deskripsi=f'Uang Makan ({total_hadir} hari)',
+            jumlah=uang_makan_harian * total_hadir,
+        ))
+    if uang_bensin_harian > 0 and total_hadir > 0:
+        new_items.append(PayrollItem(
+            payroll_id=payroll.id,
+            kategori='Pendapatan',
+            deskripsi=f'Uang Bensin ({total_hadir} hari)',
+            jumlah=uang_bensin_harian * total_hadir,
+        ))
+
+    new_items.append(PayrollItem(
+        payroll_id=payroll.id,
+        kategori='Potongan',
+        deskripsi=f'Potongan Absen ({total_alpa} hari)',
+        jumlah=potongan_absen,
+    ))
+    if potongan_kasbon > 0:
+        new_items.append(PayrollItem(
+            payroll_id=payroll.id,
+            kategori='Potongan',
+            deskripsi='Potongan Kasbon',
+            jumlah=potongan_kasbon,
+        ))
+    if potongan_service_motor > 0:
+        new_items.append(PayrollItem(
+            payroll_id=payroll.id,
+            kategori='Potongan',
+            deskripsi='Potongan Service Motor',
+            jumlah=potongan_service_motor,
+        ))
+
+    db.session.add_all(new_items)
+    for kasbon in kasbon_list:
+        kasbon.payroll_id = payroll.id
+        kasbon.status = 'Diproses Payroll'
+        kasbon.terpilih = False
+    for service_motor in service_motor_list:
+        service_motor.payroll_id = payroll.id
+
+    all_items = existing_items + new_items
+    payroll.total_tidak_hadir = total_alpa
+    payroll.total_pendapatan = sum(
+        float(item.jumlah or 0) for item in all_items
+        if item.kategori == 'Pendapatan'
+    )
+    payroll.total_potongan = sum(
+        float(item.jumlah or 0) for item in all_items
+        if item.kategori == 'Potongan'
+    )
+    payroll.gaji_bersih = payroll.total_pendapatan - payroll.total_potongan
+    return True
+
+
 @app.route('/payroll/<int:id>')
 @login_required
 def payroll_detail(id):
     payroll = Payroll.query.get_or_404(id)
     employee = payroll.employee
+    if ensure_payroll_base_items(payroll, employee):
+        db.session.commit()
+
     tahun, bulan = map(int, payroll.periode.split('-'))
 
     hari_dalam_bulan = monthrange(tahun, bulan)[1]
@@ -3676,7 +4504,7 @@ def payroll_detail(id):
 @app.route('/payroll/settings', methods=['GET', 'POST'])
 @login_required
 def payroll_settings():
-    employees = Technician.query.all()
+    employees = technician_staff_query().all()
     employee_id = request.args.get('employee_id') or request.form.get('employee_id')
 
     selected_employee = None
@@ -3740,14 +4568,14 @@ def generate_payroll():
         flash(f"❌ Periode hanya bisa antara {first_valid} hingga {last_valid}.", "danger")
         return redirect(url_for('payroll_index'))
 
-    if employee_ids:
-        technicians = Technician.query.filter(
-            Technician.id.in_(employee_ids)
-        ).all()
-    else:
-        technicians = Technician.query.filter(
-            Technician.status.in_(["Aktif", "Resign"])
-        ).all()
+    if not employee_ids:
+        flash("Pilih minimal satu karyawan Internal.", "warning")
+        return redirect(url_for('payroll_index'))
+
+    technicians = technician_staff_query().filter(
+        func.lower(Technician.team) == 'internal',
+        Technician.id.in_(employee_ids)
+    ).all()
 
     if not technicians:
         flash("⚠️ Tidak ada teknisi ditemukan.", "warning")
@@ -3765,6 +4593,7 @@ def generate_payroll():
             ).first()
 
             if exists:
+                ensure_payroll_base_items(exists, tech)
                 total_skip += 1
                 continue
 
@@ -3886,114 +4715,90 @@ def generate_payroll():
                 potongan_service_motor
             )
 
-        payroll = Payroll(
+            payroll = Payroll(
                 employee_id=tech.id,
                 periode=periode,
                 total_pendapatan=total_pendapatan,
                 total_potongan=total_potongan,
                 gaji_bersih=total_pendapatan - total_potongan,
                 total_tidak_hadir=total_alpa,
-                status="Draft"
+                status="Draft",
             )
+            db.session.add(payroll)
+            db.session.flush()
 
-        db.session.add(payroll)
-        db.session.flush()
+            items = []
+            if gaji_pokok_prorata > 0:
+                items.append(PayrollItem(
+                    payroll_id=payroll.id,
+                    kategori="Pendapatan",
+                    deskripsi="Gaji Pokok",
+                    jumlah=gaji_pokok_prorata,
+                ))
 
-        items = []
+            if bonus_bulanan > 0:
+                items.append(PayrollItem(
+                    payroll_id=payroll.id,
+                    kategori="Pendapatan",
+                    deskripsi="Bonus Bulanan",
+                    jumlah=bonus_bulanan,
+                ))
 
-            # =====================
-            # PENDAPATAN
-            # =====================
+            if uang_makan_harian > 0 and total_hadir > 0:
+                items.append(PayrollItem(
+                    payroll_id=payroll.id,
+                    kategori="Pendapatan",
+                    deskripsi=f"Uang Makan ({total_hadir} hari)",
+                    jumlah=uang_makan_harian * total_hadir,
+                ))
 
-        if gaji_pokok_prorata > 0:
-                items.append(
-                    PayrollItem(
-                        payroll_id=payroll.id,
-                        kategori="Pendapatan",
-                        deskripsi="Gaji Pokok",
-                        jumlah=gaji_pokok_prorata
-                    )
-                )
+            if uang_bensin_harian > 0 and total_hadir > 0:
+                items.append(PayrollItem(
+                    payroll_id=payroll.id,
+                    kategori="Pendapatan",
+                    deskripsi=f"Uang Bensin ({total_hadir} hari)",
+                    jumlah=uang_bensin_harian * total_hadir,
+                ))
 
-        if bonus_bulanan > 0:
-                items.append(
-                    PayrollItem(
-                        payroll_id=payroll.id,
-                        kategori="Pendapatan",
-                        deskripsi="Bonus Bulanan",
-                        jumlah=bonus_bulanan
-                    )
-                )
+            if potongan_absen > 0:
+                items.append(PayrollItem(
+                    payroll_id=payroll.id,
+                    kategori="Potongan",
+                    deskripsi=f"Potongan Absen ({total_alpa} hari)",
+                    jumlah=potongan_absen,
+                ))
 
-        if uang_makan_harian > 0 and total_hadir > 0:
-                items.append(
-                    PayrollItem(
-                        payroll_id=payroll.id,
-                        kategori="Pendapatan",
-                        deskripsi=f"Uang Makan ({total_hadir} hari)",
-                        jumlah=uang_makan_harian * total_hadir
-                    )
-                )
+            if potongan_kasbon > 0:
+                items.append(PayrollItem(
+                    payroll_id=payroll.id,
+                    kategori="Potongan",
+                    deskripsi="Potongan Kasbon",
+                    jumlah=potongan_kasbon,
+                ))
 
-        if uang_bensin_harian > 0 and total_hadir > 0:
-                items.append(
-                    PayrollItem(
-                        payroll_id=payroll.id,
-                        kategori="Pendapatan",
-                        deskripsi=f"Uang Bensin ({total_hadir} hari)",
-                        jumlah=uang_bensin_harian * total_hadir
-                    )
-                )
+            if potongan_service_motor > 0:
+                items.append(PayrollItem(
+                    payroll_id=payroll.id,
+                    kategori="Potongan",
+                    deskripsi="Potongan Service Motor",
+                    jumlah=potongan_service_motor,
+                ))
 
-            # =====================
-            # POTONGAN
-            # =====================
+            db.session.add_all(items)
 
-        if potongan_absen > 0:
-                items.append(
-                    PayrollItem(
-                        payroll_id=payroll.id,
-                        kategori="Potongan",
-                        deskripsi=f"Potongan Absen ({total_alpa} hari)",
-                        jumlah=potongan_absen
-                    )
-                )
+            for kasbon in kasbon_list:
+                kasbon.payroll_id = payroll.id
+                kasbon.status = "Diproses Payroll"
+                kasbon.terpilih = False
 
-        if potongan_kasbon > 0:
-                items.append(
-                    PayrollItem(
-                        payroll_id=payroll.id,
-                        kategori="Potongan",
-                        deskripsi="Potongan Kasbon",
-                        jumlah=potongan_kasbon
-                    )
-                )
+            for service_motor in service_motor_list:
+                service_motor.payroll_id = payroll.id
 
-        if potongan_service_motor > 0:
-                items.append(
-                    PayrollItem(
-                        payroll_id=payroll.id,
-                        kategori="Potongan",
-                        deskripsi="Potongan Service Motor",
-                        jumlah=potongan_service_motor
-                    )
-                )
-
-        db.session.add_all(items)
-
-        for k in kasbon_list:
-                k.payroll_id = payroll.id
-                k.status = "Diproses Payroll"
-                k.terpilih = False
-
-        for s in service_motor_list:
-                s.payroll_id = payroll.id
-
-        print("=" * 50)
-        print("PAYROLL:", payroll.id)
-        print("ITEMS DIBUAT:", len(items))
-        print("=" * 50)
-        total_digenerate += 1
+            print("=" * 50)
+            print("PAYROLL:", payroll.id)
+            print("ITEMS DIBUAT:", len(items))
+            print("=" * 50)
+            total_digenerate += 1
 
         db.session.commit()
 
@@ -4049,6 +4854,19 @@ def rupiah(value):
         return f"Rp {value:,.0f}".replace(",", ".")
     except Exception:
         return "Rp 0"
+
+
+@app.template_filter('incentive_status_badge')
+def incentive_status_badge(status):
+    mapping = {
+        'Draft': 'secondary',
+        'Menunggu Verifikasi': 'info',
+        'Disetujui': 'success',
+        'Masuk Payroll': 'primary',
+        'Dibayar': 'dark',
+        'Ditolak': 'danger',
+    }
+    return mapping.get(status, 'secondary')
 
 
 # =========================
@@ -4150,31 +4968,63 @@ def payroll_print(id):
         
     )
 
+    incentive_items = [
+        item for item in items
+        if item.kategori == 'Pendapatan'
+        and (item.deskripsi or '').strip().lower().startswith('insentif pekerjaan')
+    ]
+    display_items = [
+        {
+            'kategori': item.kategori,
+            'deskripsi': item.deskripsi,
+            'jumlah': item.jumlah,
+        }
+        for item in items
+        if item not in incentive_items
+    ]
+    if incentive_items:
+        grouped_incentive = {
+            'kategori': 'Pendapatan',
+            'deskripsi': f'Insentif Pekerjaan ({len(incentive_items)} pekerjaan)',
+            'jumlah': sum(float(item.jumlah or 0) for item in incentive_items),
+        }
+        first_income_index = next(
+            (index for index, item in enumerate(display_items)
+             if item['kategori'] == 'Pendapatan'),
+            len(display_items),
+        )
+        display_items.insert(first_income_index, grouped_incentive)
+
     # 👇 Jika parameter ?pdf=true → generate PDF pakai ReportLab
     if request.args.get("pdf") == "true":
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer, pagesize=A4,
-            rightMargin=12*mm, leftMargin=12*mm,
-            topMargin=12*mm, bottomMargin=12*mm
+            rightMargin=15*mm, leftMargin=15*mm,
+            topMargin=14*mm, bottomMargin=14*mm
         )
         styles = getSampleStyleSheet()
         content = []
 
         navy = colors.HexColor('#0f172a')
-        blue = colors.HexColor('#0f4c81')
-        blue_soft = colors.HexColor('#dbeafe')
-        light = colors.HexColor('#f8fafc')
-        line = colors.HexColor('#cbd5e1')
+        blue = colors.HexColor('#176b87')
+        blue_soft = colors.HexColor('#e8f3f7')
+        light = colors.HexColor('#f7fafc')
+        line = colors.HexColor('#d8e1e8')
         text = colors.HexColor('#1f2937')
         muted = colors.HexColor('#475569')
-        green = colors.HexColor('#15803d')
-        red = colors.HexColor('#dc2626')
+        green = colors.HexColor('#087f5b')
+        red = colors.HexColor('#c2413b')
 
         title_style = ParagraphStyle(
             'TitleStyle', parent=styles['Title'],
-            fontName='Helvetica-Bold', fontSize=18, leading=20,
-            textColor=navy, alignment=1, spaceAfter=8
+            fontName='Helvetica-Bold', fontSize=16, leading=19,
+            textColor=colors.white, alignment=0, spaceAfter=0
+        )
+        slip_title_style = ParagraphStyle(
+            'SlipTitleStyle', parent=styles['Title'],
+            fontName='Helvetica-Bold', fontSize=13, leading=16,
+            textColor=colors.white, alignment=2, spaceAfter=0
         )
         subtitle_style = ParagraphStyle(
             'SubTitleStyle', parent=styles['Normal'],
@@ -4193,41 +5043,41 @@ def payroll_print(id):
         )
         section_style = ParagraphStyle(
             'SectionStyle', parent=styles['Heading2'],
-            fontName='Helvetica-Bold', fontSize=10.5, leading=14,
-            textColor=navy, spaceBefore=2, spaceAfter=5
+            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            textColor=colors.white, spaceBefore=0, spaceAfter=0
         )
         normal_cell_style = ParagraphStyle(
             'NormalCellStyle', parent=styles['BodyText'],
-            fontName='Helvetica', fontSize=9, leading=11,
+            fontName='Helvetica', fontSize=10.5, leading=13.5,
             textColor=text
         )
         amount_style = ParagraphStyle(
             'AmountStyle', parent=styles['BodyText'],
-            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            fontName='Helvetica-Bold', fontSize=10.5, leading=13.5,
             textColor=navy, alignment=2
         )
         negative_amount_style = ParagraphStyle(
             'NegativeAmountStyle', parent=styles['BodyText'],
-            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            fontName='Helvetica-Bold', fontSize=10.5, leading=13.5,
             textColor=red, alignment=2
         )
         total_label_style = ParagraphStyle(
             'TotalLabelStyle', parent=styles['BodyText'],
-            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            fontName='Helvetica-Bold', fontSize=9.5, leading=12,
             textColor=navy
         )
         total_value_style = ParagraphStyle(
             'TotalValueStyle', parent=styles['BodyText'],
-            fontName='Helvetica-Bold', fontSize=9, leading=11,
+            fontName='Helvetica-Bold', fontSize=9.5, leading=12,
             textColor=navy, alignment=2
         )
         grand_total_style = ParagraphStyle(
             'GrandTotalStyle', parent=styles['Heading2'],
-            fontName='Helvetica-Bold', fontSize=17, leading=18,
+            fontName='Helvetica-Bold', fontSize=18, leading=21,
             textColor=green, alignment=1
         )
 
-        # modern header + brand block
+        # Header and employee details
         try:
             logo = Image("static/logo.png", width=20*mm, height=20*mm)
             logo_cell = logo
@@ -4235,107 +5085,139 @@ def payroll_print(id):
             logo_cell = Paragraph("", subtitle_style)
 
         brand_header = Table([
-            [logo_cell, Paragraph("<b>PERKASA AC</b>", title_style), Paragraph("<b>Slip Gaji</b>", title_style)]
-        ], colWidths=[26*mm, 70*mm, 65*mm], hAlign='LEFT')
+            [
+                logo_cell,
+                Paragraph(
+                    f"<b>{escape(get_company_profile(request.args.get('company')).get('name', 'PERKASA AC'))}</b><br/><font size='8'>Slip gaji karyawan</font>",
+                    title_style,
+                ),
+                Paragraph("SLIP GAJI", slip_title_style),
+            ]
+        ], colWidths=[27*mm, 105*mm, 48*mm], hAlign='LEFT')
         brand_header.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), blue_soft),
+            ('BACKGROUND', (0,0), (-1,-1), navy),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (-1,-1), 10),
+            ('RIGHTPADDING', (0,0), (-1,-1), 10),
+            ('TOPPADDING', (0,0), (-1,-1), 9),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 9),
+        ]))
+        content.append(brand_header)
+        content.append(Spacer(1, 12))
+
+        employee_rows = [
+            [
+                Paragraph("KARYAWAN", label_style),
+                Paragraph(escape(employee.nama or "-"), value_style),
+                Paragraph("JABATAN", label_style),
+                Paragraph(escape(employee.jabatan or "-"), value_style),
+            ],
+            [
+                Paragraph("TANGGAL MASUK", label_style),
+                Paragraph(employee.tanggal_masuk.strftime("%d-%m-%Y") if employee.tanggal_masuk else "-", value_style),
+                Paragraph("PERIODE GAJI", label_style),
+                Paragraph(escape(payroll.periode or "-"), value_style),
+            ],
+        ]
+        employee_table = Table(employee_rows, colWidths=[28*mm, 62*mm, 29*mm, 61*mm])
+        employee_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), light),
+            ('BOX', (0,0), (-1,-1), 0.7, line),
+            ('INNERGRID', (0,0), (-1,-1), 0.35, line),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('LEFTPADDING', (0,0), (-1,-1), 8),
             ('RIGHTPADDING', (0,0), (-1,-1), 8),
             ('TOPPADDING', (0,0), (-1,-1), 8),
             ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-            ('GRID', (0,0), (-1,-1), 0.5, blue_soft),
-        ]))
-        content.append(brand_header)
-        content.append(Spacer(1, 10))
-
-        employee_rows = [
-            [Paragraph("Nama / NIK", label_style), Paragraph(":", label_style), Paragraph(employee.nama or "-", value_style)],
-            [Paragraph("Jabatan", label_style), Paragraph(":", label_style), Paragraph(employee.jabatan or "-", value_style)],
-            [Paragraph("Tanggal Masuk", label_style), Paragraph(":", label_style), Paragraph(employee.tanggal_masuk.strftime("%d-%m-%Y") if employee.tanggal_masuk else "-", value_style)],
-            [Paragraph("Periode", label_style), Paragraph(":", label_style), Paragraph(payroll.periode or "-", value_style)],
-        ]
-        employee_table = Table(employee_rows, colWidths=[34*mm, 7*mm, 118*mm])
-        employee_table.setStyle(TableStyle([
-            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
-            ('TOPPADDING', (0,0), (-1,-1), 3),
-            ('LEFTPADDING', (0,0), (-1,-1), 0),
-            ('RIGHTPADDING', (0,0), (-1,-1), 0),
         ]))
         content.append(employee_table)
-        content.append(Spacer(1, 12))
+        content.append(Spacer(1, 14))
 
-        pendapatan_rows = [[Paragraph("<b>Pendapatan</b>", section_style), Paragraph("", section_style)]]
-        for item in items:
-            if item.kategori == "Pendapatan":
+        pendapatan_rows = [[
+            Paragraph("PENDAPATAN", section_style),
+            Paragraph("JUMLAH", section_style),
+        ]]
+        for item in display_items:
+            if item['kategori'] == "Pendapatan":
                 pendapatan_rows.append([
-                    Paragraph(item.deskripsi or "-", normal_cell_style),
-                    Paragraph(f"Rp {item.jumlah:,.0f}", amount_style),
+                    Paragraph(escape(item['deskripsi'] or "-"), normal_cell_style),
+                    Paragraph(f"Rp {item['jumlah']:,.0f}", amount_style),
                 ])
         pendapatan_rows.append([
             Paragraph("<b>Total Pendapatan</b>", total_label_style),
             Paragraph(f"Rp {total_pendapatan:,.0f}", total_value_style),
         ])
 
-        potongan_rows = [[Paragraph("<b>Potongan</b>", section_style), Paragraph("", section_style)]]
-        for item in items:
-            if item.kategori == "Potongan":
+        potongan_rows = [[
+            Paragraph("POTONGAN", section_style),
+            Paragraph("JUMLAH", section_style),
+        ]]
+        for item in display_items:
+            if item['kategori'] == "Potongan":
                 potongan_rows.append([
-                    Paragraph(item.deskripsi or "-", normal_cell_style),
-                    Paragraph(f"-Rp {item.jumlah:,.0f}", negative_amount_style),
+                    Paragraph(escape(item['deskripsi'] or "-"), normal_cell_style),
+                    Paragraph(f"-Rp {item['jumlah']:,.0f}", negative_amount_style),
                 ])
         potongan_rows.append([
             Paragraph("<b>Total Potongan</b>", total_label_style),
             Paragraph(f"-Rp {total_potongan:,.0f}", negative_amount_style),
         ])
 
-        table_pendapatan = Table(pendapatan_rows, colWidths=[62*mm, 26*mm])
-        table_potongan = Table(potongan_rows, colWidths=[62*mm, 26*mm])
+        table_pendapatan = Table(pendapatan_rows, colWidths=[137*mm, 43*mm], repeatRows=1)
+        table_potongan = Table(potongan_rows, colWidths=[137*mm, 43*mm], repeatRows=1)
 
         for table_item in [table_pendapatan, table_potongan]:
             table_item.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), blue_soft),
-                ('GRID', (0,0), (-1,-1), 0.8, line),
+                ('BACKGROUND', (0,0), (-1,0), blue),
+                ('BOX', (0,0), (-1,-1), 0.7, line),
+                ('INNERGRID', (0,0), (-1,-1), 0.35, line),
                 ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                 ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
-                ('LEFTPADDING', (0,0), (-1,-1), 7),
-                ('RIGHTPADDING', (0,0), (-1,-1), 7),
-                ('TOPPADDING', (0,0), (-1,-1), 6),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                ('LEFTPADDING', (0,0), (-1,-1), 9),
+                ('RIGHTPADDING', (0,0), (-1,-1), 9),
+                ('TOPPADDING', (0,0), (-1,-1), 8),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 8),
                 ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, light]),
+                ('BACKGROUND', (0,-1), (-1,-1), blue_soft),
+                ('LINEABOVE', (0,-1), (-1,-1), 0.8, blue),
             ]))
 
-        summary_table = Table([[table_pendapatan, table_potongan]], colWidths=[88*mm, 88*mm])
-        summary_table.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('LEFTPADDING', (0,0), (-1,-1), 0),
-            ('RIGHTPADDING', (0,0), (-1,-1), 0),
-            ('SPACING', (0,0), (-1,-1), 0),
-        ]))
-        content.append(summary_table)
-        content.append(Spacer(1, 18))
+        content.append(table_pendapatan)
+        content.append(Spacer(1, 12))
+        content.append(table_potongan)
+        content.append(Spacer(1, 14))
 
         grand_total_table = Table([
-            [Paragraph("<b>Total Diterima</b>", total_label_style), Paragraph(f"<b>Rp {gaji_bersih:,.0f}</b>", grand_total_style)]
-        ], colWidths=[78*mm, 76*mm])
+            [Paragraph("TOTAL DITERIMA", total_label_style), Paragraph(f"Rp {gaji_bersih:,.0f}", grand_total_style)]
+        ], colWidths=[90*mm, 90*mm])
         grand_total_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#ecfdf5')),
-            ('GRID', (0,0), (-1,-1), 1.2, line),
+            ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#a7d9c4')),
             ('ALIGN', (1,0), (1,0), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('LEFTPADDING', (0,0), (-1,-1), 10),
-            ('RIGHTPADDING', (0,0), (-1,-1), 10),
-            ('TOPPADDING', (0,0), (-1,-1), 10),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+            ('LEFTPADDING', (0,0), (-1,-1), 12),
+            ('RIGHTPADDING', (0,0), (-1,-1), 12),
+            ('TOPPADDING', (0,0), (-1,-1), 11),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 11),
         ]))
         content.append(grand_total_table)
-        content.append(Spacer(1, 16))
+        content.append(Spacer(1, 18))
 
-        content.append(Paragraph(f"Dicetak pada: {datetime.now().strftime('%d/%m/%Y %H:%M')}", subtitle_style))
-        content.append(Spacer(1, 10))
-        content.append(Paragraph("Tanda Tangan Karyawan", subtitle_style))
-        content.append(Spacer(1, 8))
-        content.append(Paragraph("__________________________", subtitle_style))
+        footer_table = Table([
+            [
+                Paragraph(f"Dicetak pada {datetime.now().strftime('%d/%m/%Y %H:%M')}", subtitle_style),
+                Paragraph(f"Diterima oleh<br/><br/><br/><b>{escape(employee.nama or '')}</b>", subtitle_style),
+            ]
+        ], colWidths=[90*mm, 90*mm])
+        footer_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('ALIGN', (1,0), (1,0), 'CENTER'),
+            ('LINEABOVE', (1,0), (1,0), 0.7, line),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            ('LEFTPADDING', (0,0), (-1,-1), 4),
+            ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ]))
+        content.append(footer_table)
 
         doc.build(content)
         pdf = buffer.getvalue()
@@ -4351,7 +5233,7 @@ def payroll_print(id):
         'payroll/print_slip.html',
         payroll=payroll,
         employee=employee,
-        items=items,
+        items=display_items,
         total_pendapatan=total_pendapatan,
         total_potongan=total_potongan,
         total_tidak_hadir=total_tidak_hadir,
@@ -4395,7 +5277,7 @@ def kasbon_list():
     kasbons = query.order_by(Kasbon.tanggal.desc()).all()
 
     # Ambil semua teknisi untuk dropdown
-    teknisis = Technician.query.order_by(Technician.nama).all()
+    teknisis = technician_staff_query().all()
 
     return render_template(
         'karyawan/kasbon_list.html',
@@ -4411,7 +5293,7 @@ def kasbon_list():
 @app.route('/kasbon/tambah', methods=['GET', 'POST'])
 @login_required
 def kasbon_tambah():
-    technicians = Technician.query.all()
+    technicians = technician_staff_query().all()
     if request.method == 'POST':
         tech_id = request.form['technician_id']
         jumlah = float(request.form['jumlah'])
@@ -4515,6 +5397,7 @@ def debug_kasbon(tech_id):
 def reminders_auto():
     today = date.today()
     active_tab = request.args.get('tab', 'reminder')
+    selected_package = request.args.get('paket_cuci', '').strip()
 
     services = (
     Service.query
@@ -4523,6 +5406,14 @@ def reminders_auto():
     .all()
 )
 
+    package_options = sorted({
+        service.paket_cuci.strip()
+        for service in services
+        if service.jenis_service
+        and 'cuci' in service.jenis_service.lower()
+        and service.paket_cuci
+        and service.paket_cuci.strip()
+    })
 
     # Ambil hanya service cuci terakhir untuk setiap customer. Dengan begitu,
     # service lama tidak dapat menampilkan reminder setelah customer cuci lagi.
@@ -4555,6 +5446,7 @@ def reminders_auto():
             "alamat": cust.alamat,
             "team": cust.team,
             "unit": f"{unit.merk} ({unit.pk}) x{unit.jumlah_unit}",
+            "paket_cuci": s.paket_cuci,
             "tanggal": next_date,
             "delta": delta_days,
             "service": s
@@ -4582,6 +5474,7 @@ def reminders_auto():
             "alamat": data["alamat"],
             "team": data["team"],
             "unit": data["unit"],
+            "paket_cuci": data["paket_cuci"],
             "tanggal": data["tanggal"],
             "tipe": status_reminder,
             "keterangan": reminder.keterangan_reminder if reminder else "Belum di-Reminder",
@@ -4589,8 +5482,21 @@ def reminders_auto():
             "send_count": send_count
         })
 
+    if selected_package:
+        reminders = [
+            reminder for reminder in reminders
+            if reminder["paket_cuci"] == selected_package
+        ]
+
     reminders = sorted(reminders, key=lambda x: x["tanggal"])
-    return render_template("reminders_auto.html", reminders=reminders, current_date=today, active_tab=active_tab)
+    return render_template(
+        "reminders_auto.html",
+        reminders=reminders,
+        current_date=today,
+        active_tab=active_tab,
+        package_options=package_options,
+        selected_package=selected_package
+    )
 
 
 @app.route('/reminder/send/<int:id>', methods=['POST'])
@@ -5049,7 +5955,9 @@ def attendance_edit(id):
 @login_required
 def attendance_edit_form(id):
     record = Attendance.query.get_or_404(id)
-    technicians = Technician.query.all()
+    technicians = technician_staff_query().filter(
+        func.lower(Technician.team) == 'internal'
+    ).all()
     return render_template('attendance/edit.html', record=record, technicians=technicians)
 
 
@@ -5068,7 +5976,9 @@ def attendance_report():
         extract('year', Attendance.tanggal) == year
     ).order_by(Attendance.tanggal, Attendance.jam_masuk).all()
 
-    technicians = Technician.query.filter_by(team='Internal', status='Aktif').order_by(Technician.nama).all()
+    technicians = technician_staff_query().filter(
+        func.lower(Technician.team) == 'internal'
+    ).all()
 
     status_order = ['Hadir', 'Izin', 'Sakit', 'Alpa']
     summary_by_technician = {}
@@ -5466,7 +6376,7 @@ def settings():
     if q:
         pricelist = [i for i in pricelist if q.lower() in i["nama"].lower()]
 
-    technicians = Technician.query.all()
+    technicians = technician_staff_query().all()
 
     return render_template(
         "settings_modern.html",

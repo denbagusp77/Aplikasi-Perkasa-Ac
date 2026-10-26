@@ -67,6 +67,8 @@
   .customer-address { display: block; max-width: 190px; line-height: 1.35; }
   .wa-link { color: #438d82; white-space: nowrap; }
   .unit-text { white-space: nowrap; }
+  .reminder-filter { max-width: 600px; }
+  .reminder-filter select { min-width: 220px; }
   .date-badge, .status-badge, .sent-badge {
     display: inline-block;
     border-radius: 3px;
@@ -109,6 +111,20 @@
 
   <p class="small text-muted mb-3">Menampilkan jadwal cuci H-14 hingga H-1 serta jadwal yang sudah lewat dan belum melakukan cuci kembali.</p>
 
+  <form method="get" action="{{ url_for('reminders_auto') }}" class="reminder-filter d-flex gap-2 flex-wrap mb-3">
+    <input type="hidden" name="tab" value="reminder">
+    <select name="paket_cuci" class="form-select form-select-sm" aria-label="Filter paket cuci">
+      <option value="">Semua Paket Cuci</option>
+      {% for package in package_options %}
+      <option value="{{ package }}" {% if selected_package == package %}selected{% endif %}>{{ package }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+    {% if selected_package %}
+    <a href="{{ url_for('reminders_auto') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+    {% endif %}
+  </form>
+
   <div class="reminder-table-wrap">
     <table class="reminder-table">
       <thead>
@@ -118,6 +134,7 @@
           <th>Alamat</th>
           <th>Team</th>
           <th>Unit</th>
+          <th>Paket Cuci</th>
           <th>Tgl Cuci<br>Berikutnya</th>
           <th>Status<br>Reminder</th>
           <th>Keterangan</th>
@@ -138,6 +155,7 @@
             <span class="team-badge {% if r.team != 'Internal' %}external{% endif %}">{{ r.team or '-' }}</span>
           </td>
           <td><span class="unit-text">{{ r.unit }}</span></td>
+          <td>{{ r.paket_cuci or '-' }}</td>
           <td><span class="date-badge">{{ r.tanggal.strftime('%d/%m/%Y') }}</span></td>
           <td>
             {% if r.tipe == 'Hari Ini' %}
@@ -177,7 +195,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="empty-row">Tidak ada jadwal reminder atau jadwal cuci yang terlewat.</td></tr>
+        <tr><td colspan="10" class="empty-row">Tidak ada jadwal reminder atau jadwal cuci yang terlewat untuk paket ini.</td></tr>
         {% endfor %}
       </tbody>
     </table>

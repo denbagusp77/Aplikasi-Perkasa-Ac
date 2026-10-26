@@ -1,0 +1,117 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+      <h2 class="fw-bold mb-1">Pengaturan Insentif</h2>
+      <p class="text-muted mb-0">Atur persentase bonus berdasarkan teknisi dan jenis service.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('payroll_incentive_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Kembali</a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-3">Tambah pengaturan baru</h5>
+          <form method="post">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Teknisi</label>
+              <select name="technician_id" class="form-select rounded-3" required>
+                <option value="">Pilih teknisi</option>
+                {% for tech in technicians %}
+                <option value="{{ tech.id }}" {% if selected_technician and selected_technician.id == tech.id %}selected{% endif %}>{{ tech.nama }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="alert alert-light border rounded-3 mb-3">
+              <strong>Semua jenis service</strong><br>
+              Persentase yang Anda masukkan berlaku untuk seluruh jenis pekerjaan teknisi ini.
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Persentase Insentif (%)</label>
+              <input type="number" step="0.01" min="0" max="100" name="percentage" class="form-control rounded-3" required>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Berlaku mulai</label>
+                <input type="date" name="effective_from" class="form-control rounded-3" value="{{ today.strftime('%Y-%m-%d') }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Berlaku hingga</label>
+                <input type="date" name="effective_to" class="form-control rounded-3">
+              </div>
+            </div>
+
+            <div class="form-check mt-4">
+              <input class="form-check-input" type="checkbox" name="is_active" checked>
+              <label class="form-check-label">Aktif saat ini</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary rounded-3 w-100 mt-4 fw-semibold">
+              <i class="fa fa-save me-2"></i>Simpan Pengaturan
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-3">Riwayat pengaturan</h5>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Teknisi</th>
+                  <th>Service</th>
+                  <th>%</th>
+                  <th>Mulai</th>
+                  <th>Sampai</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if settings %}
+                  {% for item in settings %}
+                  <tr>
+                    <td>{{ item.technician.nama if item.technician else '-' }}</td>
+                    <td>{{ item.service_type or 'Semua Service' }}</td>
+                    <td>{{ item.percentage }}%</td>
+                    <td>{{ item.effective_from }}</td>
+                    <td>{{ item.effective_to or '-' }}</td>
+                    <td>
+                      {% if item.is_active %}
+                        <span class="badge bg-success rounded-pill">Aktif</span>
+                      {% else %}
+                        <span class="badge bg-secondary rounded-pill">Nonaktif</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <form method="post" action="{{ url_for('payroll_incentive_setting_delete', id=item.id) }}" onsubmit="return confirm('Hapus pengaturan ini?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill">Hapus</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="7" class="text-center text-muted py-4">Belum ada pengaturan insentif.</td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

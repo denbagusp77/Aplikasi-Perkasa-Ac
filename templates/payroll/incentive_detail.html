@@ -1,0 +1,103 @@
+{% extends "base_modern.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+      <h2 class="fw-bold mb-1">Detail Insentif</h2>
+      <p class="text-muted mb-0">Informasi rincian komisi pekerjaan teknisi.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('payroll_incentive_dashboard', period=incentive.period) }}" class="btn btn-outline-secondary rounded-pill">Kembali</a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h4 class="fw-bold mb-0">{{ incentive.technician.nama if incentive.technician else '-' }}</h4>
+            <span class="badge bg-{{ incentive.status|incentive_status_badge }} rounded-pill px-3 py-2">{{ incentive.status }}</span>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="text-muted small mb-1">Service</div>
+                <div class="fw-bold">{{ incentive.service.jenis_service if incentive.service else '-' }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="text-muted small mb-1">Periode</div>
+                <div class="fw-bold">{{ incentive.period }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="text-muted small mb-1">Nilai Job</div>
+                <div class="fw-bold text-primary">{{ incentive.service_value|rupiah }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="text-muted small mb-1">Persentase</div>
+                <div class="fw-bold">{{ incentive.percentage }}%</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="text-muted small mb-1">Jumlah Insentif</div>
+                <div class="fw-bold text-success fs-5">{{ incentive.incentive_amount|rupiah }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="text-muted small mb-1">Disetujui Oleh</div>
+                <div class="fw-bold">{{ incentive.approved_by or '-' }}</div>
+              </div>
+            </div>
+          </div>
+
+          {% if incentive.rejection_reason %}
+          <div class="alert alert-danger mt-4 mb-0 rounded-3">
+            <strong>Alasan penolakan:</strong><br>
+            {{ incentive.rejection_reason }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-3">Aksi</h5>
+
+          <form method="post" action="{{ url_for('payroll_incentive_approve', id=incentive.id) }}" class="mb-3">
+            <input type="hidden" name="decision" value="approve">
+            <button type="submit" class="btn btn-success rounded-3 w-100 fw-semibold">
+              <i class="fa fa-check me-2"></i>Setujui Insentif
+            </button>
+          </form>
+
+          <form method="post" action="{{ url_for('payroll_incentive_approve', id=incentive.id) }}">
+            <input type="hidden" name="decision" value="reject">
+            <label class="form-label fw-semibold">Alasan Penolakan</label>
+            <textarea name="rejection_reason" class="form-control rounded-3 mb-3" rows="4" placeholder="Masukkan alasan jika ditolak..."></textarea>
+            <button type="submit" class="btn btn-outline-danger rounded-3 w-100 fw-semibold">
+              <i class="fa fa-times-circle me-2"></i>Tolak Insentif
+            </button>
+          </form>
+
+          <form method="post" action="{{ url_for('payroll_incentive_to_payroll', id=incentive.id) }}" class="mt-4">
+            <button type="submit" class="btn btn-dark rounded-3 w-100 fw-semibold">
+              <i class="fa fa-wallet me-2"></i>Masukkan ke Payroll
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
