@@ -5397,6 +5397,7 @@ def debug_kasbon(tech_id):
 def reminders_auto():
     today = date.today()
     active_tab = request.args.get('tab', 'reminder')
+    selected_package = request.args.get('paket_cuci', '').strip()
 
     services = (
     Service.query
@@ -5405,6 +5406,14 @@ def reminders_auto():
     .all()
 )
 
+    package_options = sorted({
+        service.paket_cuci.strip()
+        for service in services
+        if service.jenis_service
+        and 'cuci' in service.jenis_service.lower()
+        and service.paket_cuci
+        and service.paket_cuci.strip()
+    })
 
     # Ambil hanya service cuci terakhir untuk setiap customer. Dengan begitu,
     # service lama tidak dapat menampilkan reminder setelah customer cuci lagi.
@@ -5437,6 +5446,7 @@ def reminders_auto():
             "alamat": cust.alamat,
             "team": cust.team,
             "unit": f"{unit.merk} ({unit.pk}) x{unit.jumlah_unit}",
+            "paket_cuci": s.paket_cuci,
             "tanggal": next_date,
             "delta": delta_days,
             "service": s
@@ -5464,6 +5474,7 @@ def reminders_auto():
             "alamat": data["alamat"],
             "team": data["team"],
             "unit": data["unit"],
+            "paket_cuci": data["paket_cuci"],
             "tanggal": data["tanggal"],
             "tipe": status_reminder,
             "keterangan": reminder.keterangan_reminder if reminder else "Belum di-Reminder",
@@ -5471,8 +5482,21 @@ def reminders_auto():
             "send_count": send_count
         })
 
+    if selected_package:
+        reminders = [
+            reminder for reminder in reminders
+            if reminder["paket_cuci"] == selected_package
+        ]
+
     reminders = sorted(reminders, key=lambda x: x["tanggal"])
-    return render_template("reminders_auto.html", reminders=reminders, current_date=today, active_tab=active_tab)
+    return render_template(
+        "reminders_auto.html",
+        reminders=reminders,
+        current_date=today,
+        active_tab=active_tab,
+        package_options=package_options,
+        selected_package=selected_package
+    )
 
 
 @app.route('/reminder/send/<int:id>', methods=['POST'])
