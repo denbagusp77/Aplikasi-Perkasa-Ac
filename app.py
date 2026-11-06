@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta
 from urllib.parse import quote
 import io
 import json
+import math
 import os
 import re
 import requests
@@ -310,11 +311,11 @@ class InstallationPackage(db.Model):
 
     @property
     def total_modal(self):
-        return sum(item.quantity * ((item.material.harga_modal if item.material else item.service.harga_modal if item.service else 0) or 0) for item in self.items)
+        return sum(item.quantity * ((item.product.harga_modal if item.product else item.material.harga_modal if item.material else item.service.harga_modal if item.service else 0) or 0) for item in self.items)
 
     @property
     def total_jual(self):
-        return sum(item.quantity * ((item.material.harga_jual if item.material else item.service.harga_jual if item.service else 0) or 0) for item in self.items)
+        return sum(item.quantity * ((item.product.harga_jual if item.product else item.material.harga_jual if item.material else item.service.harga_jual if item.service else 0) or 0) for item in self.items)
 
     @property
     def margin_persen(self):
@@ -7419,24 +7420,36 @@ def installation_package_create():
     if not kode or not nama or InstallationPackage.query.filter_by(kode=kode).first():
         flash('Kode paket wajib unik dan nama wajib diisi.', 'danger')
         return redirect(url_for('master_pricelist'))
+
+    components = []
+    tokens = request.form.getlist('package_component')
+    if not tokens:
+        flash('Tambahkan minimal satu komponen dari data master ke paket.', 'danger')
+        return redirect(url_for('master_pricelist'))
+    for token in tokens:
+        try:
+            resource, raw_id, raw_quantity = token.split(':')
+            item_id = int(raw_id)
+            quantity = float(raw_quantity)
+        except (TypeError, ValueError):
+            flash('Data komponen paket tidak valid. Silakan pilih ulang komponennya.', 'danger')
+            return redirect(url_for('master_pricelist'))
+        if resource not in {'products', 'materials', 'services'} or item_id <= 0 or not math.isfinite(quantity) or quantity <= 0:
+            flash('Data komponen paket tidak valid. Silakan pilih ulang komponennya.', 'danger')
+            return redirect(url_for('master_pricelist'))
+
+        model = {'products': ACProduct, 'materials': Material, 'services': CatalogService}[resource]
+        component = db.session.get(model, item_id)
+        if not component or component.status != 'Aktif':
+            flash('Komponen paket tidak ditemukan atau sudah nonaktif.', 'danger')
+            return redirect(url_for('master_pricelist'))
+        component_fields = {'products': 'product_id', 'materials': 'material_id', 'services': 'service_id'}
+        components.append(InstallationPackageItem(**{component_fields[resource]: item_id, 'quantity': quantity}))
+
     package = InstallationPackage(kode=kode, nama=nama, deskripsi=request.form.get('deskripsi'),
                                   garansi=request.form.get('garansi'), status='Aktif')
+    package.items.extend(components)
     db.session.add(package)
-    for token in request.form.getlist('package_component'):
-        try:
-            resource, item_id, quantity = token.split(':')
-            quantity = max(float(quantity), 1)
-            item_id = int(item_id)
-        except (TypeError, ValueError):
-            continue
-        if resource == 'materials':
-            item = db.session.get(Material, item_id)
-            if item and item.status == 'Aktif':
-                package.items.append(InstallationPackageItem(material_id=item.id, quantity=quantity))
-        elif resource == 'services':
-            item = db.session.get(CatalogService, item_id)
-            if item and item.status == 'Aktif':
-                package.items.append(InstallationPackageItem(service_id=item.id, quantity=quantity))
     db.session.commit()
     flash('Paket instalasi berhasil ditambahkan.', 'success')
     return redirect(url_for('master_pricelist'))
@@ -7481,6 +7494,49 @@ def master_pricelist_api_detail(resource, id):
     if resource == 'products' and 'margin_persen' in payload:
         cost = payload.get('harga_modal', item.harga_modal)
         payload['harga_jual'] = selling_price_from_margin(cost, payload.pop('margin_persen'))
+    if resource == 'packages' and 'items' in payload:
+        requested_items = payload.pop('items')
+        if not isinstance(requested_items, list) or not requested_items:
+            return jsonify({'error': 'Paket harus memiliki minimal satu komponen.'}), 400
+
+        existing_items = {
+            ('products', package_item.product_id)
+            for package_item in item.items if package_item.product_id
+        } | {
+            ('materials', package_item.material_id)
+            for package_item in item.items if package_item.material_id
+        } | {
+            ('services', package_item.service_id)
+            for package_item in item.items if package_item.service_id
+        }
+        component_fields = {'products': 'product_id', 'materials': 'material_id', 'services': 'service_id'}
+        components = []
+        for component_data in requested_items:
+            if not isinstance(component_data, dict):
+                return jsonify({'error': 'Format komponen paket tidak valid.'}), 400
+            component_resource = component_data.get('resource')
+            if component_resource not in component_fields:
+                return jsonify({'error': 'Jenis komponen paket tidak valid.'}), 400
+            try:
+                component_id = int(component_data.get('id'))
+                quantity = float(component_data.get('quantity'))
+            except (TypeError, ValueError):
+                return jsonify({'error': 'ID atau jumlah komponen tidak valid.'}), 400
+            if component_id <= 0 or not math.isfinite(quantity) or quantity <= 0:
+                return jsonify({'error': 'Jumlah komponen harus lebih besar dari nol.'}), 400
+
+            component_model = {'products': ACProduct, 'materials': Material, 'services': CatalogService}[component_resource]
+            component = db.session.get(component_model, component_id)
+            if not component:
+                return jsonify({'error': 'Komponen master tidak ditemukan.'}), 404
+            if component.status != 'Aktif' and (component_resource, component_id) not in existing_items:
+                return jsonify({'error': 'Komponen baru harus berstatus aktif.'}), 400
+            components.append(InstallationPackageItem(
+                **{component_fields[component_resource]: component_id, 'quantity': quantity}
+            ))
+
+        item.items.clear()
+        item.items.extend(components)
     editable = {
         'products': {'seri', 'model', 'pk', 'jenis', 'refrigerant', 'tegangan_nominal', 'kapasitas_btu', 'daya_watt', 'arus_ampere', 'harga_modal', 'harga_distributor', 'harga_dealer', 'harga_jual', 'status'},
         'materials': {'nama', 'kategori', 'merk', 'satuan', 'harga_modal', 'harga_jual', 'supplier', 'stok', 'minimal_stok', 'lokasi_gudang', 'barcode', 'status'},

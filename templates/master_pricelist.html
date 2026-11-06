@@ -20,7 +20,7 @@
   .package-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(360px,1fr); gap:12px; }
   .package-panel { border:1px solid var(--erp-line); border-radius:8px; background:#fff; overflow:hidden; }
   .package-panel-header { padding:12px 14px; background:#f4f8fc; border-bottom:1px solid var(--erp-line); }
-  .package-list-row { display:grid; grid-template-columns:28px 1fr auto auto; gap:9px; align-items:center; padding:10px 12px; border-bottom:1px solid #edf2f7; cursor:pointer; }
+  .package-list-row { width:100%; display:grid; grid-template-columns:28px 1fr auto auto; gap:9px; align-items:center; padding:10px 12px; border:0; border-bottom:1px solid #edf2f7; background:#fff; color:inherit; text-align:left; cursor:pointer; }
   .package-list-row:hover, .package-list-row.active { background:#edf5ff; }
   .package-list-row .package-icon { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:#e6f0ff; color:#1769aa; }
   .package-detail { padding:14px; }
@@ -31,6 +31,10 @@
   .package-components-table th { background:#edf3f8; padding:7px; }
   .package-components-table td { padding:7px; border-bottom:1px solid #edf2f7; }
   .package-hidden-form { display:none!important; }
+  #packageEditModal .modal-content { height:100%; }
+  #packageEditForm { display:flex; flex:1 1 auto; flex-direction:column; min-height:0; }
+  #packageEditForm .modal-body { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  #packageEditForm .modal-footer { flex:0 0 auto; background:#fff; }
   @media (max-width:900px) { .package-layout { grid-template-columns:1fr; } }
 </style>
 <main class="erp-page">
@@ -56,22 +60,146 @@
   </div>
 </main>
 <div class="modal fade" id="editModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form id="editForm"><div class="modal-header"><h5 class="modal-title">Edit Data Master</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3" id="editFields"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary"><i class="bi bi-check-lg"></i> Simpan Perubahan</button></div></form></div></div></div>
+<div class="modal fade" id="packageEditModal" tabindex="-1" aria-labelledby="packageEditTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <form id="packageEditForm">
+        <div class="modal-header">
+          <div><h5 class="modal-title" id="packageEditTitle">Edit Paket</h5><small class="text-muted" id="packageEditCode"></small></div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-5"><label class="form-label" for="packageEditName">Nama paket</label><input id="packageEditName" class="form-control" required maxlength="150"></div>
+            <div class="col-md-3"><label class="form-label" for="packageEditWarranty">Garansi</label><input id="packageEditWarranty" class="form-control" maxlength="100"></div>
+            <div class="col-md-4"><label class="form-label" for="packageEditStatus">Status</label><select id="packageEditStatus" class="form-select"><option>Aktif</option><option>Nonaktif</option></select></div>
+            <div class="col-12"><label class="form-label" for="packageEditDescription">Keterangan</label><textarea id="packageEditDescription" class="form-control" rows="2"></textarea></div>
+          </div>
+          <div id="packageEditComponents">
+            <h6 class="mb-2">Komponen Paket</h6>
+            <p class="small text-muted">Nama dan harga komponen diambil dari Master. Ubah harga pada tab Produk, Material, atau Jasa.</p>
+            <div class="row g-2 align-items-end mb-3">
+              <div class="col-md-3"><label class="form-label" for="editComponentType">Jenis komponen</label><select id="editComponentType" class="form-select"><option value="products">Produk AC</option><option value="materials">Material</option><option value="services">Jasa</option></select></div>
+              <div class="col-md-6"><label class="form-label" for="editComponentSearch">Cari komponen master</label><input id="editComponentSearch" class="form-control mb-2" type="search" placeholder="Ketik nama produk, material, atau jasa..."><select id="editComponentSelect" class="form-select" aria-label="Pilih komponen dari Master"></select><small id="editComponentSearchCount" class="text-muted"></small></div>
+              <div class="col-md-2"><label class="form-label" for="editComponentQuantity">Qty</label><input id="editComponentQuantity" class="form-control" type="number" min=".01" step=".01" value="1"></div>
+              <div class="col-md-1"><button id="addEditComponent" class="btn btn-outline-primary w-100" type="button" aria-label="Tambah komponen"><i class="bi bi-plus-lg"></i></button></div>
+            </div>
+            <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Jenis</th><th>Komponen Master</th><th class="text-end">Harga Jual</th><th class="text-end">Qty</th><th class="text-end">Subtotal</th><th></th></tr></thead><tbody id="editComponentRows"></tbody></table></div>
+            <div class="row g-2">
+              <div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Modal</small><strong id="editComponentCost" class="d-block">Rp 0</strong></div></div>
+              <div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Jual</small><strong id="editComponentSell" class="d-block text-primary">Rp 0</strong></div></div>
+              <div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Profit</small><strong id="editComponentProfit" class="d-block text-success">Rp 0</strong></div></div>
+              <div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Margin</small><strong id="editComponentMargin" class="d-block">0%</strong></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Simpan Paket</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
 <script>
+const productSearch = document.getElementById('productSearch');
+const productBrand = document.getElementById('productBrand');
+const productType = document.getElementById('productType');
+const productPk = document.getElementById('productPk');
+const productStatus = document.getElementById('productStatus');
+const materialSearch = document.getElementById('materialSearch');
+const materialCategory = document.getElementById('materialCategory');
+const materialStock = document.getElementById('materialStock');
+const materialStatus = document.createElement('select');
+materialStatus.id = 'materialStatus';
+materialStatus.className = 'form-select';
+materialStatus.innerHTML = '<option value="Aktif" selected>Material aktif</option><option value="Nonaktif">Material nonaktif</option><option value="">Semua status</option>';
+materialSearch.closest('.col-md-6').classList.replace('col-md-6', 'col-md-3');
+const materialStatusColumn = document.createElement('div');
+materialStatusColumn.className = 'col-md-3';
+materialStatusColumn.appendChild(materialStatus);
+materialSearch.closest('.filter-bar').appendChild(materialStatusColumn);
+document.querySelectorAll('#materialTable tr[data-search]').forEach(row => {
+  const editButton = row.querySelector('.edit-record');
+  row.dataset.status = JSON.parse(editButton.dataset.fields).status;
+});
+const serviceSearch = document.getElementById('serviceSearch');
+const serviceStatus = document.getElementById('serviceStatus');
+const packageSearch = document.getElementById('packageSearch');
 const editModal = new bootstrap.Modal(document.getElementById('editModal'));
 const labels = {seri:'Seri', model:'Model', pk:'PK', jenis:'Jenis', refrigerant:'Refrigerant', tegangan_nominal:'Tegangan Nominal', kapasitas_btu:'Kapasitas BTU/H', daya_watt:'Daya (W)', arus_ampere:'Arus (A)', harga_modal:'Harga Modal', harga_distributor:'Harga Distributor', harga_dealer:'Harga Dealer', harga_jual:'Harga Jual', margin_persen:'Margin (%)', nama:'Nama', kategori:'Kategori', merk:'Merk', satuan:'Satuan', supplier:'Supplier', stok:'Stok', minimal_stok:'Minimal Stok', lokasi_gudang:'Lokasi Gudang', barcode:'Barcode', komisi_teknisi:'Komisi Teknisi', estimasi_waktu_menit:'Estimasi Waktu (Menit)', garansi:'Garansi', deskripsi:'Deskripsi', status:'Status'};
 const numericFields = new Set(['pk','kapasitas_btu','daya_watt','arus_ampere','harga_modal','harga_distributor','harga_dealer','harga_jual','margin_persen','stok','minimal_stok','komisi_teknisi','estimasi_waktu_menit']);
 function text(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character])); }
-function applyFilter(tableId, predicate) { const table = document.getElementById(tableId); const rows = [...table.querySelectorAll('tr:not(.no-results)')]; let visible = 0; rows.forEach(row => { const matches = predicate(row); row.classList.toggle('d-none', !matches); if (matches) visible++; }); table.querySelector('.no-results')?.classList.toggle('d-none', visible !== 0); }
+function applyFilter(tableId, predicate) {
+  const table = document.getElementById(tableId);
+  const rows = [...table.querySelectorAll('tr[data-search]')];
+  let visible = 0;
+  rows.forEach(row => {
+    const matches = predicate(row);
+    row.classList.toggle('d-none', !matches);
+    if (matches) visible++;
+    else {
+      const selection = row.querySelector('.bulk-select');
+      if (selection) selection.checked = false;
+    }
+  });
+  table.querySelector('.no-results')?.classList.toggle('d-none', visible !== 0);
+  table.dispatchEvent(new Event('catalog-filtered'));
+}
 function filterProducts() { const search = productSearch.value.toLowerCase(); applyFilter('productTable', row => row.dataset.search.toLowerCase().includes(search) && (!productBrand.value || row.dataset.brand === productBrand.value) && (!productType.value || row.dataset.type === productType.value) && (!productPk.value || row.dataset.pk === productPk.value) && (!productStatus.value || row.dataset.status === productStatus.value)); }
 [productSearch, productBrand, productType, productPk, productStatus].forEach(control => control.addEventListener('input', filterProducts));
-function filterMaterials() { const search = materialSearch.value.toLowerCase(); applyFilter('materialTable', row => row.dataset.search.toLowerCase().includes(search) && (!materialCategory.value || row.dataset.category === materialCategory.value) && (!materialStock.value || row.dataset.stock === materialStock.value)); }
-[materialSearch, materialCategory, materialStock].forEach(control => control.addEventListener('input', filterMaterials));
+function filterMaterials() { const search = materialSearch.value.toLowerCase(); applyFilter('materialTable', row => row.dataset.search.toLowerCase().includes(search) && (!materialCategory.value || row.dataset.category === materialCategory.value) && (!materialStock.value || row.dataset.stock === materialStock.value) && (!materialStatus.value || row.dataset.status === materialStatus.value)); }
+[materialSearch, materialCategory, materialStock, materialStatus].forEach(control => control.addEventListener('input', filterMaterials));
+filterMaterials();
 function filterServices() { const search = serviceSearch.value.toLowerCase(); applyFilter('serviceTable', row => row.dataset.search.toLowerCase().includes(search) && (!serviceStatus.value || row.dataset.status === serviceStatus.value)); }
 [serviceSearch, serviceStatus].forEach(control => control.addEventListener('input', filterServices));
 packageSearch.addEventListener('input', () => applyFilter('packageTable', row => row.dataset.search.toLowerCase().includes(packageSearch.value.toLowerCase())));
 document.querySelectorAll('.edit-record').forEach(button => button.addEventListener('click', () => { const data = JSON.parse(button.dataset.fields); if (button.dataset.resource === 'products') data.margin_persen = marginFromPrice(Number(data.harga_modal || 0), Number(data.harga_jual || 0)).toFixed(2); const fields = document.getElementById('editFields'); document.getElementById('editForm').dataset.resource = button.dataset.resource; document.getElementById('editForm').dataset.id = button.dataset.id; fields.innerHTML = Object.entries(data).map(([key, value]) => key === 'status' ? `<div class="col-md-4"><label class="form-label">Status</label><select class="form-select" name="status"><option ${value === 'Aktif' ? 'selected' : ''}>Aktif</option><option ${value === 'Nonaktif' ? 'selected' : ''}>Nonaktif</option></select></div>` : `<div class="col-md-6"><label class="form-label">${labels[key] || key}</label><input class="form-control" name="${key}" type="${numericFields.has(key) ? 'number' : 'text'}" step="any" value="${text(value)}"></div>`).join(''); if (button.dataset.resource === 'products') attachMarginCalculator(fields); editModal.show(); }));
-document.getElementById('editForm').addEventListener('submit', async event => { event.preventDefault(); const form = event.currentTarget; const payload = Object.fromEntries(new FormData(form).entries()); for (const field of numericFields) if (payload[field] !== undefined) payload[field] = Number(payload[field] || 0); const response = await fetch(`/api/master-pricelist/${form.dataset.resource}/${form.dataset.id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); if (!response.ok) return alert((await response.json()).error || 'Data gagal diperbarui.'); window.location.reload(); });
-document.querySelectorAll('.delete-record').forEach(button => button.addEventListener('click', async () => { if (!confirm(`Nonaktifkan ${button.dataset.name}? Data historis tidak akan dihapus.`)) return; const response = await fetch(`/api/master-pricelist/${button.dataset.resource}/${button.dataset.id}`, {method:'DELETE'}); if (!response.ok) return alert((await response.json()).error || 'Data gagal dinonaktifkan.'); window.location.reload(); }));
+document.getElementById('editForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submitButton = form.querySelector('button[type="submit"], button:not([type])');
+  const payload = Object.fromEntries(new FormData(form).entries());
+  for (const field of numericFields) {
+    if (payload[field] !== undefined) payload[field] = Number(payload[field] || 0);
+  }
+  submitButton.disabled = true;
+  try {
+    const response = await fetch(`/api/master-pricelist/${form.dataset.resource}/${form.dataset.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      alert(result.error || 'Data gagal diperbarui.');
+      return;
+    }
+    window.location.reload();
+  } catch (error) {
+    console.error('Gagal memperbarui data master:', error);
+    alert('Koneksi gagal. Periksa jaringan lalu coba simpan kembali.');
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+document.querySelectorAll('.delete-record').forEach(button => button.addEventListener('click', async () => {
+  if (!confirm(`Nonaktifkan ${button.dataset.name}? Data historis tidak akan dihapus.`)) return;
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/master-pricelist/${button.dataset.resource}/${button.dataset.id}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) {
+      alert(result.error || 'Data gagal dinonaktifkan.');
+      return;
+    }
+    window.location.reload();
+  } catch (error) {
+    console.error('Gagal menonaktifkan data master:', error);
+    alert('Koneksi gagal. Periksa jaringan lalu coba kembali.');
+  } finally {
+    button.disabled = false;
+  }
+}));
 const chart = document.getElementById('brandSalesChart'); if (chart && window.Chart) new Chart(chart, {type:'bar', data:{labels:{{ brand_sales_labels|tojson }}, datasets:[{label:'Item penawaran', data:{{ brand_sales_values|tojson }}, backgroundColor:'#1769aa'}]}, options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 function priceFromMargin(cost, margin) { return margin >= 100 || !cost ? 0 : Math.round(cost / (1 - margin / 100)); }
 function marginFromPrice(cost, price) { return !price ? 0 : (price - cost) / price * 100; }
@@ -87,6 +215,24 @@ function attachMarginCalculator(container) {
   margin.addEventListener('input', updatePrice);
   price.addEventListener('input', updateMargin);
 }
+const packageSources = {
+  products: [{% for product in products %}{id: {{ product.id }}, name: {{ (product.brand.nama ~ ' ' ~ product.model)|tojson }}, cost: {{ product.harga_modal or 0 }}, price: {{ product.harga_jual or 0 }}, unit: 'Unit', active: {{ (product.status == 'Aktif')|tojson }}},{% endfor %}],
+  materials: [{% for material in materials %}{id: {{ material.id }}, name: {{ material.nama|tojson }}, cost: {{ material.harga_modal or 0 }}, price: {{ material.harga_jual or 0 }}, unit: {{ material.satuan|tojson }}, active: {{ (material.status == 'Aktif')|tojson }}},{% endfor %}],
+  services: [{% for service in services %}{id: {{ service.id }}, name: {{ service.nama|tojson }}, cost: {{ service.harga_modal or 0 }}, price: {{ service.harga_jual or 0 }}, unit: 'Pekerjaan', active: {{ (service.status == 'Aktif')|tojson }}},{% endfor %}]
+};
+const formatPackageCurrency = value => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(value || 0))}`;
+function populateComponentSelect(select, searchInput, countElement, resource) {
+  const activeItems = packageSources[resource].filter(item => item.active);
+  const query = searchInput.value.trim().toLocaleLowerCase();
+  const matches = activeItems.filter(item => item.name.toLocaleLowerCase().includes(query));
+  const selectedId = select.value;
+  select.innerHTML = matches.map(item => `<option value="${item.id}">${text(item.name)} (${formatPackageCurrency(item.price)})</option>`).join('') ||
+    '<option value="">Tidak ada komponen yang cocok</option>';
+  if (matches.some(item => String(item.id) === selectedId)) select.value = selectedId;
+  countElement.textContent = matches.length
+    ? `${matches.length} komponen ditemukan${query ? ` dari ${activeItems.length} aktif` : ' (aktif)'}`
+    : `Tidak ada hasil${query ? ` untuk "${text(searchInput.value.trim())}"` : ''}.`;
+}
 const productCreateForm = document.querySelector('form[action="{{ url_for('product_create') }}"]');
 const createPrice = productCreateForm?.querySelector('[name="harga_jual"]');
 if (createPrice) {
@@ -98,25 +244,23 @@ if (createPrice) {
 }
 const packageForm = document.querySelector('form[action="{{ url_for('installation_package_create') }}"]');
 if (packageForm) {
-  const packageSources = {
-    materials: [{% for material in materials if material.status == 'Aktif' %}{id: {{ material.id }}, name: {{ material.nama|tojson }}, cost: {{ material.harga_modal or 0 }}, price: {{ material.harga_jual or 0 }}},{% endfor %}],
-    services: [{% for service in services if service.status == 'Aktif' %}{id: {{ service.id }}, name: {{ service.nama|tojson }}, cost: {{ service.harga_modal or 0 }}, price: {{ service.harga_jual or 0 }}},{% endfor %}]
-  };
   const descriptionColumn = packageForm.querySelector('[name="deskripsi"]')?.closest('.col-md-4');
   if (descriptionColumn) descriptionColumn.classList.add('d-none');
   const picker = document.createElement('div');
   picker.className = 'col-12';
-  picker.innerHTML = `<div class="border rounded p-3 bg-white"><div class="row g-2 align-items-end"><div class="col-md-3"><label class="form-label">Jenis Komponen</label><select id="packageComponentType" class="form-select"><option value="materials">Material</option><option value="services">Jasa</option></select></div><div class="col-md-6"><label class="form-label">Pilih dari Master</label><select id="packageComponentSelect" class="form-select"></select></div><div class="col-md-2"><label class="form-label">Qty</label><input id="packageComponentQty" type="number" min="1" step=".1" value="1" class="form-control"></div><div class="col-md-1"><button id="addPackageComponent" type="button" class="btn btn-outline-primary w-100" title="Tambah komponen"><i class="bi bi-plus-lg"></i></button></div></div><div id="packageComponents" class="mt-3"></div><div class="row g-2 mt-2"><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Modal</small><b id="packageCost" class="d-block">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Jual</small><b id="packageSell" class="d-block text-primary">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Profit</small><b id="packageProfit" class="d-block text-success">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Margin</small><b id="packageMargin" class="d-block">0%</b></div></div></div></div>`;
+  picker.innerHTML = `<div class="border rounded p-3 bg-white"><div class="row g-2 align-items-end"><div class="col-md-3"><label class="form-label">Jenis Komponen</label><select id="packageComponentType" class="form-select"><option value="products">Produk AC</option><option value="materials">Material</option><option value="services">Jasa</option></select></div><div class="col-md-6"><label class="form-label" for="packageComponentSearch">Cari komponen master</label><input id="packageComponentSearch" type="search" class="form-control mb-2" placeholder="Ketik nama produk, material, atau jasa..."><select id="packageComponentSelect" class="form-select" aria-label="Pilih komponen dari Master"></select><small id="packageComponentSearchCount" class="text-muted"></small></div><div class="col-md-2"><label class="form-label">Qty</label><input id="packageComponentQty" type="number" min=".01" step=".01" value="1" class="form-control"></div><div class="col-md-1"><button id="addPackageComponent" type="button" class="btn btn-outline-primary w-100" title="Tambah komponen"><i class="bi bi-plus-lg"></i></button></div></div><div id="packageComponents" class="mt-3"></div><div class="row g-2 mt-2"><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Modal</small><b id="packageCost" class="d-block">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Total Jual</small><b id="packageSell" class="d-block text-primary">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Profit</small><b id="packageProfit" class="d-block text-success">Rp 0</b></div></div><div class="col-6 col-lg-3"><div class="border rounded p-2"><small class="text-muted">Margin</small><b id="packageMargin" class="d-block">0%</b></div></div></div></div>`;
   packageForm.insertBefore(picker, packageForm.lastElementChild);
   const selectedComponents = [];
   const componentType = picker.querySelector('#packageComponentType');
   const componentSelect = picker.querySelector('#packageComponentSelect');
+  const componentSearch = picker.querySelector('#packageComponentSearch');
+  const componentSearchCount = picker.querySelector('#packageComponentSearchCount');
   const componentQuantity = picker.querySelector('#packageComponentQty');
   const componentList = picker.querySelector('#packageComponents');
   const formatRupiah = value => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(value))}`;
-  const renderOptions = () => { componentSelect.innerHTML = packageSources[componentType.value].map(item => `<option value="${item.id}">${text(item.name)} (${formatRupiah(item.price)})</option>`).join('') || '<option value="">Data master belum tersedia</option>'; };
+  const renderOptions = () => populateComponentSelect(componentSelect, componentSearch, componentSearchCount, componentType.value);
   const renderComponents = () => {
-    componentList.innerHTML = selectedComponents.length ? `<table class="table table-sm mb-0"><thead><tr><th>Jenis</th><th>Komponen</th><th class="text-end">Qty</th><th class="text-end">Modal</th><th class="text-end">Jual</th><th></th></tr></thead><tbody>${selectedComponents.map((item, index) => `<tr><td>${item.resource === 'materials' ? 'Material' : 'Jasa'}</td><td>${text(item.name)}</td><td class="text-end">${item.quantity}</td><td class="text-end">${formatRupiah(item.cost * item.quantity)}</td><td class="text-end">${formatRupiah(item.price * item.quantity)}</td><td><button type="button" class="btn btn-sm btn-outline-danger remove-package-component" data-index="${index}" title="Hapus komponen"><i class="bi bi-x-lg"></i></button></td></tr>`).join('')}</tbody></table>` : '<small class="text-muted">Belum ada komponen.</small>';
+    componentList.innerHTML = selectedComponents.length ? `<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Jenis</th><th>Komponen dari Master</th><th class="text-end">Harga Jual</th><th class="text-end">Qty</th><th class="text-end">Subtotal</th><th></th></tr></thead><tbody>${selectedComponents.map((item, index) => `<tr><td>${item.resource === 'products' ? 'Produk AC' : item.resource === 'materials' ? 'Material' : 'Jasa'}</td><td>${text(item.name)}<small class="d-block text-muted">Modal ${formatRupiah(item.cost)} / ${text(item.unit)}</small></td><td class="text-end">${formatRupiah(item.price)}</td><td class="text-end">${item.quantity} ${text(item.unit)}</td><td class="text-end">${formatRupiah(item.price * item.quantity)}</td><td><button type="button" class="btn btn-sm btn-outline-danger remove-package-component" data-index="${index}" title="Hapus komponen"><i class="bi bi-x-lg"></i></button></td></tr>`).join('')}</tbody></table></div>` : '<small class="text-muted">Belum ada komponen. Tambahkan produk, material, atau jasa dari Master.</small>';
     packageForm.querySelectorAll('[name="package_component"]').forEach(input => input.remove());
     selectedComponents.forEach(item => { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'package_component'; input.value = `${item.resource}:${item.id}:${item.quantity}`; packageForm.appendChild(input); });
     const cost = selectedComponents.reduce((total, item) => total + item.cost * item.quantity, 0); const sell = selectedComponents.reduce((total, item) => total + item.price * item.quantity, 0); const profit = sell - cost;
@@ -124,7 +268,26 @@ if (packageForm) {
     componentList.querySelectorAll('.remove-package-component').forEach(button => button.addEventListener('click', () => { selectedComponents.splice(Number(button.dataset.index), 1); renderComponents(); }));
   };
   componentType.addEventListener('change', renderOptions);
-  picker.querySelector('#addPackageComponent').addEventListener('click', () => { const item = packageSources[componentType.value].find(source => source.id === Number(componentSelect.value)); if (!item) return; selectedComponents.push({...item, resource: componentType.value, quantity: Math.max(Number(componentQuantity.value) || 1, 1)}); renderComponents(); });
+  componentSearch.addEventListener('input', renderOptions);
+  picker.querySelector('#addPackageComponent').addEventListener('click', () => {
+    const item = packageSources[componentType.value].find(source => source.id === Number(componentSelect.value) && source.active);
+    if (!item) return;
+    const quantity = Number(componentQuantity.value);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      componentQuantity.focus();
+      return;
+    }
+    const existing = selectedComponents.find(component => component.resource === componentType.value && component.id === item.id);
+    if (existing) existing.quantity += quantity;
+    else selectedComponents.push({...item, resource: componentType.value, quantity});
+    renderComponents();
+  });
+  packageForm.addEventListener('submit', event => {
+    if (!selectedComponents.length) {
+      event.preventDefault();
+      alert('Tambahkan minimal satu komponen dari data master ke paket.');
+    }
+  });
   renderOptions(); renderComponents();
 }
 document.querySelectorAll('#packageTable tr:not(.no-results)').forEach((row, index) => {
@@ -157,8 +320,7 @@ document.querySelectorAll('.edit-record, .delete-record').forEach(button => butt
 const bulkTables = [
   ['productTable', 'products', 'produk'],
   ['materialTable', 'materials', 'material'],
-  ['serviceTable', 'services', 'jasa'],
-  ['packageTable', 'packages', 'paket']
+  ['serviceTable', 'services', 'jasa']
 ];
 bulkTables.forEach(([tableId, resource, label]) => {
   const table = document.getElementById(tableId);
@@ -166,9 +328,9 @@ bulkTables.forEach(([tableId, resource, label]) => {
   const header = table.closest('table')?.querySelector('thead tr');
   if (!header) return;
   const selectHeader = document.createElement('th');
-  selectHeader.innerHTML = '<input type="checkbox" class="form-check-input bulk-select-all" title="Pilih semua">';
+  selectHeader.innerHTML = '<input type="checkbox" class="form-check-input bulk-select-all" title="Pilih semua baris yang tampil">';
   header.prepend(selectHeader);
-  table.querySelectorAll('tr:not(.no-results)').forEach(row => {
+  table.querySelectorAll('tr[data-search]').forEach(row => {
     const cell = document.createElement('td');
     const id = row.querySelector('.delete-record')?.dataset.id || row.querySelector('.edit-record')?.dataset.id;
     cell.innerHTML = `<input type="checkbox" class="form-check-input bulk-select" value="${id || ''}">`;
@@ -176,25 +338,49 @@ bulkTables.forEach(([tableId, resource, label]) => {
   });
   const toolbar = document.createElement('div');
   toolbar.className = 'd-flex justify-content-between align-items-center mb-2 gap-2';
-  toolbar.innerHTML = `<small class="text-muted bulk-count">0 ${label} dipilih</small><button type="button" class="btn btn-sm btn-outline-danger bulk-delete"><i class="bi bi-trash"></i> Hapus Terpilih</button>`;
+  toolbar.innerHTML = `<small class="text-muted bulk-count">0 ${label} dipilih</small><button type="button" class="btn btn-sm btn-outline-danger bulk-delete"><i class="bi bi-trash"></i> Nonaktifkan Terpilih</button>`;
   table.closest('.table-responsive')?.before(toolbar);
   const all = toolbar.previousElementSibling?.querySelector('.bulk-select-all') || header.querySelector('.bulk-select-all');
   const count = toolbar.querySelector('.bulk-count');
   const updateSelection = () => {
     const selected = [...table.querySelectorAll('.bulk-select:checked')];
+    const visibleSelections = [...table.querySelectorAll('tr[data-search]:not(.d-none) .bulk-select')];
+    const visibleSelectedCount = visibleSelections.filter(input => input.checked).length;
     count.textContent = `${selected.length} ${label} dipilih`;
-    if (all) all.checked = selected.length > 0 && selected.length === table.querySelectorAll('.bulk-select').length;
+    toolbar.querySelector('.bulk-delete').disabled = selected.length === 0;
+    if (all) {
+      all.checked = visibleSelections.length > 0 && visibleSelectedCount === visibleSelections.length;
+      all.indeterminate = visibleSelectedCount > 0 && visibleSelectedCount < visibleSelections.length;
+    }
   };
-  all?.addEventListener('change', () => { table.querySelectorAll('.bulk-select').forEach(input => { input.checked = all.checked; }); updateSelection(); });
+  updateSelection();
+  all?.addEventListener('change', () => {
+    table.querySelectorAll('tr[data-search]:not(.d-none) .bulk-select').forEach(input => { input.checked = all.checked; });
+    updateSelection();
+  });
   table.addEventListener('change', event => { if (event.target.classList.contains('bulk-select')) updateSelection(); });
+  table.addEventListener('catalog-filtered', updateSelection);
   toolbar.querySelector('.bulk-delete').addEventListener('click', async () => {
     const selected = [...table.querySelectorAll('.bulk-select:checked')];
     if (!selected.length) return alert(`Pilih minimal satu ${label}.`);
     if (!confirm(`Nonaktifkan ${selected.length} ${label} terpilih? Data historis tidak akan dihapus.`)) return;
     rememberCatalogTab(`#${table.closest('.tab-pane').id}`);
-    const results = await Promise.all(selected.map(input => fetch(`/api/master-pricelist/${resource}/${input.value}`, { method: 'DELETE' })));
-    if (results.some(response => !response.ok)) return alert('Sebagian data gagal dinonaktifkan.');
-    window.location.reload();
+    const button = toolbar.querySelector('.bulk-delete');
+    button.disabled = true;
+    try {
+      const results = await Promise.all(selected.map(input => fetch(`/api/master-pricelist/${resource}/${input.value}`, { method: 'DELETE' })));
+      const failedCount = results.filter(response => !response.ok).length;
+      if (failedCount) {
+        alert(`${selected.length - failedCount} data berhasil dinonaktifkan, ${failedCount} gagal. Muat ulang halaman untuk melihat hasilnya.`);
+        return;
+      }
+      window.location.reload();
+    } catch (error) {
+      console.error('Gagal menonaktifkan pilihan katalog:', error);
+      alert('Koneksi gagal. Tidak semua data dapat diproses.');
+    } finally {
+      button.disabled = false;
+    }
   });
 });
 
@@ -203,7 +389,8 @@ const packageTab = document.getElementById('paket');
 if (packageTab) {
   const packageCreateForm = packageTab.querySelector('form[action="{{ url_for('installation_package_create') }}"]');
   const packageTable = packageTab.querySelector('#packageTable')?.closest('.table-responsive');
-  const packageData = [{% for package in packages %}{id: {{ package.id }}, kode: {{ package.kode|tojson }}, nama: {{ package.nama|tojson }}, deskripsi: {{ (package.deskripsi or '')|tojson }}, garansi: {{ (package.garansi or '')|tojson }}, status: {{ package.status|tojson }}, total: {{ package.total_jual }}, modal: {{ package.total_modal }}, items: [{% for item in package.items %}{name: {{ (item.material.nama if item.material else item.service.nama if item.service else '-')|tojson }}, qty: {{ item.quantity }}, unit: {{ (item.material.satuan if item.material else 'Pekerjaan')|tojson }}, price: {{ (item.material.harga_jual if item.material else item.service.harga_jual if item.service else 0) }}}{% if not loop.last %},{% endif %}{% endfor %}]}{% if not loop.last %},{% endif %}{% endfor %}];
+  const packageData = [{% for package in packages %}{id: {{ package.id }}, kode: {{ package.kode|tojson }}, nama: {{ package.nama|tojson }}, deskripsi: {{ (package.deskripsi or '')|tojson }}, garansi: {{ (package.garansi or '')|tojson }}, status: {{ package.status|tojson }}, total: {{ package.total_jual }}, modal: {{ package.total_modal }}, items: [{% for item in package.items %}{% set item_resource = 'products' if item.product else 'materials' if item.material else 'services' %}{% set master_item = item.product if item.product else item.material if item.material else item.service %}{resource: {{ item_resource|tojson }}, id: {{ master_item.id }}, name: {{ ((master_item.brand.nama ~ ' ' ~ master_item.model) if item.product else master_item.nama)|tojson }}, qty: {{ item.quantity }}, unit: {{ (master_item.satuan if item.material else 'Unit' if item.product else 'Pekerjaan')|tojson }}, cost: {{ master_item.harga_modal }}, price: {{ master_item.harga_jual }}, active: {{ (master_item.status == 'Aktif')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]}{% if not loop.last %},{% endif %}{% endfor %}];
+  const packageEditModal = new bootstrap.Modal(document.getElementById('packageEditModal'));
   const rupiah = value => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(value || 0))}`;
   const dashboard = document.createElement('div');
   dashboard.className = 'package-dashboard';
@@ -226,17 +413,151 @@ if (packageTab) {
   const list = dashboard.querySelector('#packageDashboardList');
   const detail = dashboard.querySelector('#packageDashboardDetail');
   let selectedId = packageData[0]?.id;
+  let editedComponents = [];
+  const packageEditComponents = document.getElementById('packageEditComponents');
+  const packageEditForm = document.getElementById('packageEditForm');
+  const editComponentSearch = packageEditComponents.querySelector('#editComponentSearch');
+  const editComponentSearchCount = packageEditComponents.querySelector('#editComponentSearchCount');
+  const componentTypeLabel = resource => resource === 'products' ? 'Produk AC' : resource === 'materials' ? 'Material' : 'Jasa';
+  function renderEditComponents() {
+    const componentType = packageEditComponents.querySelector('#editComponentType').value;
+    populateComponentSelect(
+      packageEditComponents.querySelector('#editComponentSelect'),
+      editComponentSearch,
+      editComponentSearchCount,
+      componentType
+    );
+
+    const rows = editedComponents.map((component, index) => `
+      <tr>
+        <td>${componentTypeLabel(component.resource)}${component.active === false ? '<span class="badge bg-secondary ms-1">Nonaktif</span>' : ''}</td>
+        <td>${text(component.name)}<small class="d-block text-muted">Modal ${rupiah(component.cost)} / ${text(component.unit)}</small></td>
+        <td class="text-end">${rupiah(component.price)}</td>
+        <td><input class="form-control form-control-sm text-end edit-component-quantity" type="number" min=".01" step=".01" value="${component.qty}" data-index="${index}" aria-label="Jumlah ${text(component.name)}"></td>
+        <td class="text-end">${rupiah(component.price * component.qty)}</td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-edit-component" data-index="${index}" aria-label="Hapus ${text(component.name)}"><i class="bi bi-x-lg"></i></button></td>
+      </tr>`).join('');
+    packageEditComponents.querySelector('#editComponentRows').innerHTML = rows ||
+      '<tr><td colspan="6" class="text-muted text-center py-3">Belum ada komponen. Tambahkan dari data master.</td></tr>';
+
+    const cost = editedComponents.reduce((total, component) => total + component.cost * component.qty, 0);
+    const sell = editedComponents.reduce((total, component) => total + component.price * component.qty, 0);
+    packageEditComponents.querySelector('#editComponentCost').textContent = rupiah(cost);
+    packageEditComponents.querySelector('#editComponentSell').textContent = rupiah(sell);
+    packageEditComponents.querySelector('#editComponentProfit').textContent = rupiah(sell - cost);
+    packageEditComponents.querySelector('#editComponentMargin').textContent = sell ? `${((sell - cost) / sell * 100).toFixed(2)}%` : '0%';
+  }
+  function openPackageEditor(packageId) {
+    const packageItem = packageData.find(entry => entry.id === packageId);
+    if (!packageItem) return;
+    packageEditForm.dataset.id = packageItem.id;
+    document.getElementById('packageEditTitle').textContent = `Edit Paket: ${packageItem.nama}`;
+    document.getElementById('packageEditCode').textContent = `Kode ${packageItem.kode}`;
+    document.getElementById('packageEditName').value = packageItem.nama;
+    document.getElementById('packageEditWarranty').value = packageItem.garansi;
+    document.getElementById('packageEditDescription').value = packageItem.deskripsi;
+    document.getElementById('packageEditStatus').value = packageItem.status;
+    editedComponents = packageItem.items.map(component => ({...component}));
+    renderEditComponents();
+    packageEditModal.show();
+  }
+  packageEditComponents.querySelector('#editComponentType').addEventListener('change', renderEditComponents);
+  editComponentSearch.addEventListener('input', renderEditComponents);
+  packageEditComponents.querySelector('#addEditComponent').addEventListener('click', () => {
+    const resource = packageEditComponents.querySelector('#editComponentType').value;
+    const componentId = Number(packageEditComponents.querySelector('#editComponentSelect').value);
+    const source = packageSources[resource].find(entry => entry.id === componentId && entry.active);
+    const quantity = Number(packageEditComponents.querySelector('#editComponentQuantity').value);
+    if (!source) return;
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      packageEditComponents.querySelector('#editComponentQuantity').focus();
+      return;
+    }
+    const existing = editedComponents.find(entry => entry.resource === resource && entry.id === source.id);
+    if (existing) existing.qty += quantity;
+    else editedComponents.push({...source, resource, qty: quantity});
+    renderEditComponents();
+  });
+  packageEditComponents.addEventListener('change', event => {
+    if (!event.target.classList.contains('edit-component-quantity')) return;
+    const index = Number(event.target.dataset.index);
+    const quantity = Number(event.target.value);
+    if (Number.isFinite(quantity) && quantity > 0) editedComponents[index].qty = quantity;
+    renderEditComponents();
+  });
+  packageEditComponents.addEventListener('click', event => {
+    const button = event.target.closest('.remove-edit-component');
+    if (!button) return;
+    editedComponents.splice(Number(button.dataset.index), 1);
+    renderEditComponents();
+  });
+  packageEditForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!editedComponents.length) {
+      alert('Paket harus memiliki minimal satu komponen.');
+      return;
+    }
+    const submitButton = packageEditForm.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    try {
+      const response = await fetch(`/api/master-pricelist/packages/${packageEditForm.dataset.id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          nama: document.getElementById('packageEditName').value.trim(),
+          deskripsi: document.getElementById('packageEditDescription').value.trim(),
+          garansi: document.getElementById('packageEditWarranty').value.trim(),
+          status: document.getElementById('packageEditStatus').value,
+          items: editedComponents.map(component => ({
+            resource: component.resource,
+            id: component.id,
+            quantity: component.qty
+          }))
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        alert(result.error || 'Paket gagal diperbarui.');
+        return;
+      }
+      window.location.reload();
+    } catch (error) {
+      console.error('Gagal memperbarui paket:', error);
+      alert('Koneksi gagal. Periksa jaringan lalu coba simpan kembali.');
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
   function renderDetail() {
     const item = packageData.find(packageItem => packageItem.id === selectedId);
     if (!item) { detail.innerHTML = '<div class="text-muted">Belum ada paket. Klik Tambah Paket untuk membuat paket baru.</div>'; return; }
-    detail.innerHTML = `<div class="d-flex justify-content-between align-items-start"><div><small class="text-muted">Kode Paket</small><h5 class="mb-1">${item.kode}</h5><div>${item.nama}</div></div><span class="badge ${item.status === 'Aktif' ? 'bg-success' : 'bg-danger'}">${item.status}</span></div><div class="row g-2 mt-2"><div class="col-6"><small class="text-muted">Harga per Paket</small><strong class="d-block text-primary">${rupiah(item.total)}</strong></div><div class="col-6"><small class="text-muted">Margin Snapshot</small><strong class="d-block">${item.total ? ((item.total - item.modal) / item.total * 100).toFixed(1) : 0}%</strong></div></div><div class="package-detail-tabs"><button class="package-detail-tab active" type="button">Komponen Paket</button><button class="package-detail-tab" type="button">Keterangan</button></div><table class="package-components-table"><thead><tr><th>No</th><th>Nama Komponen</th><th>Qty</th><th>Satuan</th><th class="text-end">Harga</th></tr></thead><tbody>${item.items.length ? item.items.map((component, index) => `<tr><td>${index + 1}</td><td>${component.name}</td><td>${component.qty}</td><td>${component.unit}</td><td class="text-end">${rupiah(component.price * component.qty)}</td></tr>`).join('') : '<tr><td colspan="5" class="text-muted">Belum ada komponen.</td></tr>'}</tbody></table><div class="d-flex justify-content-between mt-3"><small class="text-muted">${item.deskripsi || 'Belum ada deskripsi paket.'}</small><button type="button" class="btn btn-sm btn-outline-primary edit-record" data-resource="packages" data-id="${item.id}" data-fields='${JSON.stringify({nama:item.nama,deskripsi:item.deskripsi,garansi:item.garansi,status:item.status}).replace(/'/g, '&apos;')}'><i class="bi bi-pencil"></i> Edit</button></div>`;
-    detail.querySelector('.edit-record')?.addEventListener('click', () => packageTable?.querySelector(`.edit-record[data-id="${item.id}"]`)?.click());
+    detail.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div><small class="text-muted">Kode Paket</small><h5 class="mb-1">${text(item.kode)}</h5><div>${text(item.nama)}</div></div>
+        <span class="badge ${item.status === 'Aktif' ? 'bg-success' : 'bg-secondary'}">${text(item.status)}</span>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-6"><small class="text-muted">Total Modal</small><strong class="d-block">${rupiah(item.modal)}</strong></div>
+        <div class="col-6"><small class="text-muted">Harga Jual Paket</small><strong class="d-block text-primary">${rupiah(item.total)}</strong></div>
+        <div class="col-6"><small class="text-muted">Profit</small><strong class="d-block text-success">${rupiah(item.total - item.modal)}</strong></div>
+        <div class="col-6"><small class="text-muted">Margin</small><strong class="d-block">${item.total ? ((item.total - item.modal) / item.total * 100).toFixed(2) : 0}%</strong></div>
+      </div>
+      <div class="package-detail-tabs"><button class="package-detail-tab active" type="button">Komponen Paket (${item.items.length})</button></div>
+      <div class="table-responsive"><table class="package-components-table">
+        <thead><tr><th>Komponen Master</th><th>Qty</th><th class="text-end">Harga Satuan</th><th class="text-end">Subtotal</th></tr></thead>
+        <tbody>${item.items.length ? item.items.map(component => `<tr><td>${text(component.name)}<small class="d-block text-muted">${componentTypeLabel(component.resource)}${component.active === false ? ' - nonaktif' : ''}</small></td><td>${component.qty} ${text(component.unit)}</td><td class="text-end">${rupiah(component.price)}</td><td class="text-end">${rupiah(component.price * component.qty)}</td></tr>`).join('') : '<tr><td colspan="4" class="text-muted">Belum ada komponen.</td></tr>'}</tbody>
+      </table></div>
+      <div class="d-flex justify-content-between align-items-center gap-2 mt-3">
+        <small class="text-muted">${text(item.deskripsi || 'Belum ada keterangan paket.')}${item.garansi ? ` | Garansi: ${text(item.garansi)}` : ''}</small>
+        <button type="button" class="btn btn-sm btn-outline-primary edit-package"><i class="bi bi-pencil"></i> Edit Paket</button>
+      </div>`;
+    detail.querySelector('.edit-package')?.addEventListener('click', () => openPackageEditor(item.id));
   }
   function renderList() {
     const query = dashboard.querySelector('#packageDashboardSearch').value.toLowerCase();
     const filter = dashboard.querySelector('#packageDashboardFilter').value;
     const filtered = packageData.filter(item => `${item.kode} ${item.nama} ${item.deskripsi}`.toLowerCase().includes(query) && (!filter || item.status === filter));
-    list.innerHTML = filtered.length ? filtered.map(item => `<div class="package-list-row ${item.id === selectedId ? 'active' : ''}" data-id="${item.id}"><span class="package-icon"><i class="bi bi-box-seam"></i></span><div><strong>${item.nama}</strong><small class="d-block text-muted">${item.kode} | ${item.items.length} komponen</small></div><span class="badge ${item.status === 'Aktif' ? 'bg-success' : 'bg-danger'}">${item.status}</span><strong class="text-primary">${rupiah(item.total)}</strong></div>`).join('') : '<div class="p-4 text-center text-muted">Paket tidak ditemukan.</div>';
+    list.innerHTML = filtered.length ? filtered.map(item => `<button type="button" class="package-list-row ${item.id === selectedId ? 'active' : ''}" data-id="${item.id}"><span class="package-icon"><i class="bi bi-box-seam"></i></span><div><strong>${text(item.nama)}</strong><small class="d-block text-muted">${text(item.kode)} | ${item.items.length} komponen</small></div><span class="badge ${item.status === 'Aktif' ? 'bg-success' : 'bg-secondary'}">${text(item.status)}</span><strong class="text-primary">${rupiah(item.total)}</strong></button>`).join('') : '<div class="p-4 text-center text-muted">Paket tidak ditemukan.</div>';
     list.querySelectorAll('.package-list-row').forEach(row => row.addEventListener('click', () => { selectedId = Number(row.dataset.id); renderList(); renderDetail(); }));
   }
   dashboard.querySelector('#packageDashboardSearch').addEventListener('input', renderList);
