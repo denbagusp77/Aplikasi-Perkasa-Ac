@@ -469,8 +469,31 @@ class Technician(db.Model):
 
 def technician_staff_query():
     return Technician.query.filter(
+        func.lower(func.trim(Technician.status)) == 'aktif',
+        or_(
+            Technician.jabatan.is_(None),
+            func.lower(func.trim(Technician.jabatan)).in_([
+                '', 'none'
+            ]),
+            func.lower(func.trim(Technician.jabatan)).like('%tekn%'),
+            func.lower(func.trim(Technician.jabatan)).like('%tekhn%'),
+            func.lower(func.trim(Technician.jabatan)).like('%help%'),
+            func.lower(func.trim(Technician.jabatan)).like('%halp%')
+        )
+    ).order_by(Technician.nama.asc())
+
+
+def attendance_employee_query():
+    return Technician.query.filter(
         func.lower(Technician.status) == 'aktif',
-        func.lower(Technician.jabatan).in_(['teknisi', 'helper'])
+        func.lower(Technician.team) == 'internal'
+    ).order_by(Technician.nama.asc())
+
+
+def payroll_employee_query():
+    return Technician.query.filter(
+        func.lower(func.trim(Technician.status)) == 'aktif',
+        func.lower(func.trim(Technician.team)) == 'internal'
     ).order_by(Technician.nama.asc())
 
 
@@ -4206,9 +4229,7 @@ def payroll_index():
 
     payrolls = query.order_by(Payroll.periode.desc()).all()
 
-    technicians = technician_staff_query().filter(
-        func.lower(Technician.team) == 'internal'
-    ).all()
+    technicians = payroll_employee_query().all()
 
     # Hitung periode valid (bulan berjalan + 3 bulan sebelumnya)
     today = date.today()
@@ -4572,8 +4593,7 @@ def generate_payroll():
         flash("Pilih minimal satu karyawan Internal.", "warning")
         return redirect(url_for('payroll_index'))
 
-    technicians = technician_staff_query().filter(
-        func.lower(Technician.team) == 'internal',
+    technicians = payroll_employee_query().filter(
         Technician.id.in_(employee_ids)
     ).all()
 
@@ -5955,10 +5975,8 @@ def attendance_edit(id):
 @login_required
 def attendance_edit_form(id):
     record = Attendance.query.get_or_404(id)
-    technicians = technician_staff_query().filter(
-        func.lower(Technician.team) == 'internal'
-    ).all()
-    return render_template('attendance/edit.html', record=record, technicians=technicians)
+    technicians = attendance_employee_query().all()
+    return render_template('attendance_edit.html', record=record, technicians=technicians)
 
 
 
@@ -5971,14 +5989,16 @@ def attendance_report():
     month = request.args.get('month', datetime.now().month, type=int)
     year = request.args.get('year', datetime.now().year, type=int)
 
-    records = Attendance.query.filter(
+    records = Attendance.query.join(
+        Technician, Attendance.technician_id == Technician.id
+    ).filter(
         extract('month', Attendance.tanggal) == month,
-        extract('year', Attendance.tanggal) == year
+        extract('year', Attendance.tanggal) == year,
+        func.lower(Technician.status) == 'aktif',
+        func.lower(Technician.team) == 'internal'
     ).order_by(Attendance.tanggal, Attendance.jam_masuk).all()
 
-    technicians = technician_staff_query().filter(
-        func.lower(Technician.team) == 'internal'
-    ).all()
+    technicians = attendance_employee_query().all()
 
     status_order = ['Hadir', 'Izin', 'Sakit', 'Alpa']
     summary_by_technician = {}
